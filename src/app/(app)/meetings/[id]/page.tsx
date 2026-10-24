@@ -1,5 +1,6 @@
 import Link from "next/link";
 import { notFound } from "next/navigation";
+import { TranscriptionPanel } from "@/components/transcription-panel";
 import { buttonVariants } from "@/components/ui/button";
 import { parseOffRecordRanges } from "@/lib/capture-limits";
 import { createAdminClient } from "@/lib/supabase/admin";
@@ -12,11 +13,22 @@ function formatClock(seconds: number) {
   return `${minutes}:${String(rest).padStart(2, "0")}`;
 }
 
+function formatMs(ms: number) {
+  const total = Math.max(0, Math.floor(ms / 1000));
+  const hours = Math.floor(total / 3600);
+  const minutes = Math.floor((total % 3600) / 60);
+  const seconds = total % 60;
+  const clock = `${minutes}:${String(seconds).padStart(2, "0")}`;
+  return hours > 0 ? `${hours}:${String(minutes).padStart(2, "0")}:${String(seconds).padStart(2, "0")}` : clock;
+}
+
 const sourceLabel = {
   mic: "Microphone",
   tab: "Meeting tab",
   upload: "Upload",
 } as const;
+
+const TRANSCRIBED = new Set(["transcribed", "extracting", "ready"]);
 
 export default async function MeetingPage({
   params,
@@ -45,10 +57,36 @@ export default async function MeetingPage({
   }
   if (!meeting) notFound();
 
+  let hasAudio = false;
   let playbackUrl: string | null = null;
-  if (meeting.audio_path && meeting.status !== "created" && meeting.status !== "failed") {
-    const { data } = await admin.storage.from("audio").createSignedUrl(meeting.audio_path, 60 * 60);
-    playbackUrl = data?.signedUrl ?? null;
+  if (meeting.audio_path && meeting.status !== "created") {
+    if (meeting.status === "failed") {
+      const { data, error: infoError } = await admin.storage.from("audio").info(meeting.audio_path);
+      hasAudio = !infoError && Boolean(data);
+    } else {
+      hasAudio = true;
+    }
+    if (hasAudio && meeting.audio_path) {
+      const { data } = await admin.storage.from("audio").createSignedUrl(meeting.audio_path, 60 * 60);
+      playbackUrl = data?.signedUrl ?? null;
+    }
+  }
+
+  let segments: {
+    idx: number;
+    speaker: number;
+    start_ms: number;
+    text: string;
+  }[] = [];
+  let segmentError: string | null = null;
+  if (TRANSCRIBED.has(meeting.status)) {
+    const { data, error: segmentsError } = await admin
+      .from("segments")
+      .select("idx, speaker, start_ms, text")
+      .eq("meeting_id", id)
+      .order("idx", { ascending: true });
+    if (segmentsError) segmentError = segmentsError.message;
+    else segments = data ?? [];
   }
 
   const video = typeof meeting.mime_type === "string" && meeting.mime_type.startsWith("video/");
@@ -56,21 +94,24 @@ export default async function MeetingPage({
   const source = sourceLabel[meeting.source as keyof typeof sourceLabel] ?? meeting.source;
 
   return (
-    <section className="max-w-xl">
+    <section className="max-w-2xl">
       <h1 className="text-2xl font-semibold tracking-tight">{meeting.title}</h1>
       <p className="mt-2 text-sm text-muted-foreground">
         {source}
-        {meeting.duration_sec ? ` · ${formatClock(meeting.duration_sec)}` : ""} · {meeting.status}
+        {meeting.duration_sec ? ` · ${formatClock(meeting.duration_sec)}` : ""}
       </p>
       <p className="mt-1 text-sm text-muted-foreground">
         Recorded {new Date(meeting.recorded_at).toISOString().replace("T", " ").slice(0, 16)} UTC
       </p>
-      {meeting.status === "failed" && meeting.error ? (
-        <p className="mt-4 text-sm text-destructive">{meeting.error}</p>
-      ) : null}
-      {meeting.status === "created" ? (
-        <p className="mt-4 text-sm text-muted-foreground">The upload did not finish.</p>
-      ) : null}
+      <div className="mt-6">
+        <TranscriptionPanel
+          key={`${meeting.status}:${meeting.error ?? ""}`}
+          meetingId={meeting.id}
+          status={meeting.status}
+          error={meeting.error}
+          hasAudio={hasAudio}
+        />
+      </div>
       {playbackUrl ? (
         <div className="mt-6">
           {video ? (
@@ -78,9 +119,25 @@ export default async function MeetingPage({
           ) : (
             <audio controls src={playbackUrl} className="w-full" />
           )}
-          <p className="mt-3 text-sm text-muted-foreground">
-            Audio is saved. Transcription is the next step, so this page only plays the file back.
-          </p>
+        </div>
+      ) : null}
+      {segmentError ? <p className="mt-6 text-sm text-destructive">{segmentError}</p> : null}
+      {TRANSCRIBED.has(meeting.status) && !segmentError && segments.length === 0 ? (
+        <p className="mt-6 text-sm text-muted-foreground">No speech was detected.</p>
+      ) : null}
+      {segments.length > 0 ? (
+        <div className="mt-6">
+          <h2 className="text-lg font-medium">Transcript</h2>
+          <ol className="mt-3 space-y-3">
+            {segments.map((segment) => (
+              <li key={segment.idx}>
+                <p className="text-xs text-muted-foreground">
+                  {formatMs(segment.start_ms)} · Speaker {segment.speaker}
+                </p>
+                <p className="text-sm">{segment.text}</p>
+              </li>
+            ))}
+          </ol>
         </div>
       ) : null}
       {pauses.length > 0 ? (

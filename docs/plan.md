@@ -419,7 +419,7 @@ Runs for meeting M once its speakers are mapped.
 
 - [x] Chunk 1: Scaffold, database, auth, deploy (user confirmed the five setup steps, including deploy, on Oct 25)
 - [x] Chunk 2: Capture
-- [ ] Chunk 3: Transcription
+- [x] Chunk 3: Transcription
 - [ ] Chunk 4: Evidence-first extraction
 - [ ] Chunk 5: Meeting page
 - [ ] Chunk 6: Commitment Ledger, brief, decisions
@@ -431,6 +431,7 @@ Notes and deviations:
 - The user commits and pushes himself; agents never run `git commit` or `git push`.
 - Chunk 1: Next.js 16.4.3 renamed middleware to `src/proxy.ts`. Session refresh is there. `cacheComponents` is off because signed-in pages read cookies. `@types/node` is 24 so vitest 5 installs. Product name is Kept. User confirmed Supabase, local sign-in, health, and the Vercel deploy on Oct 25. This chat did not re-open the live URL.
 - Chunk 2: Capture posts audio with a signed upload URL (plan section 8), not TUS. IndexedDB keeps the chunks until `uploaded` succeeds. The daily cap uses the UTC day in `usage_daily`, plus meetings still `uploaded` or `transcribing`. `/meetings/[id]` is only a playback stub so a finished upload can be checked; Chunk 5 replaces it with the full meeting page. Tab + mic was not cut.
+- Chunk 3: Listen uses the plan's Deepgram params plus `diarize=true`, so utterances include speaker numbers. `diarize_model=latest` still selects the model. A 400 that mentions `keyterm` is retried once without keyterms and a warning is logged. Glossary terms sent as `keyterm` are capped at 100, each 100 characters. Minutes are added to `usage_daily` for the UTC day only after status changes to `transcribed`, so opening a finished meeting does not count again. The meeting page starts transcription after upload, polls while a job is already `transcribing`, and shows Retry immediately on failure (after 20s if a job looks stuck). Gap and off-record marker text is in `src/lib/transcript-gaps.ts`; the page does not draw those markers yet (Chunk 5). A missing speaker number is stored as 0.
 
 ---
 

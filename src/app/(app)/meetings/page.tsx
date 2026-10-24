@@ -16,7 +16,7 @@ export default function MeetingsPage() {
       </div>
       <p className="mt-6 max-w-lg text-muted-foreground">
         Finished recordings are saved, but the library list comes later. After an upload, the
-        meeting page plays the file back.
+        meeting page transcribes the audio.
       </p>
     </section>
   );
