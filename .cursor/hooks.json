@@ -1,0 +1,23 @@
+{
+  "version": 1,
+  "hooks": {
+    "beforeSubmitPrompt": [
+      {
+        "command": ".cursor/hooks/capture.sh prompt",
+        "timeout": 10
+      }
+    ],
+    "afterAgentResponse": [
+      {
+        "command": ".cursor/hooks/capture.sh response",
+        "timeout": 10
+      }
+    ],
+    "stop": [
+      {
+        "command": ".cursor/hooks/capture.sh stop",
+        "timeout": 10
+      }
+    ]
+  }
+}
