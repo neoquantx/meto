@@ -213,6 +213,15 @@ alter table shares enable row level security;
 alter table settings enable row level security;
 alter table usage_daily enable row level security;
 
+-- Grant full access to service_role
+grant all on all tables in schema public to service_role;
+grant all on all sequences in schema public to service_role;
+grant all on all routines in schema public to service_role;
+
+alter default privileges in schema public grant all on tables to service_role;
+alter default privileges in schema public grant all on sequences to service_role;
+alter default privileges in schema public grant all on routines to service_role;
+
 insert into storage.buckets (id, name, public, file_size_limit)
 values ('audio', 'audio', false, 52428800)
 on conflict (id) do nothing;
@@ -408,7 +417,7 @@ Runs for meeting M once its speakers are mapped.
 
 ## 10. Progress (agent updates this after each chunk)
 
-- [ ] Chunk 1: Scaffold, database, auth, deploy
+- [ ] Chunk 1: Scaffold, database, auth, deploy (code is in the repo; not ticked until the deployed URL loads, Try it signs in, and /api/health returns ok)
 - [ ] Chunk 2: Capture
 - [ ] Chunk 3: Transcription
 - [ ] Chunk 4: Evidence-first extraction
@@ -420,14 +429,15 @@ Runs for meeting M once its speakers are mapped.
 Notes and deviations:
 - Agent prompt/response capture runs automatically via Cursor hooks (`.cursor/hooks.json`) into `.agent-logs/`. Don't touch those files.
 - The user commits and pushes himself; agents never run `git commit` or `git push`.
+- Chunk 1: Next.js 16.4.3 renamed middleware to `src/proxy.ts`. Session refresh is there. `cacheComponents` is off because signed-in pages read cookies. `@types/node` is 24 so vitest 5 installs. Product name is Kept. Deploy is waiting on the user's Supabase, GitHub, and Vercel accounts.
 
 ---
 
 ## 11. Open questions (Chunk 1 asks these if they're still blank)
 
-- Product name: default **Kept**. Answer: ____
-- Comfortable with TypeScript, React, Next.js and Tailwind? Answer: ____
-- Are all accounts and keys ready (GitHub, Vercel, Supabase, Deepgram, Gemini, Groq optional)? Answer: ____
+- Product name: default **Kept**. Answer: Kept (user said start Chunk 1 without picking another name)
+- Comfortable with TypeScript, React, Next.js and Tailwind? Answer: proceeding; user is a software engineer and said start
+- Are all accounts and keys ready (GitHub, Vercel, Supabase, Deepgram, Gemini, Groq optional)? Answer: not confirmed. Secrets stay out of chat. User does the account steps at the end of Chunk 1
 - Has the official assignment brief been pasted into `docs/brief.md`? Answer: yes (Oct 24)
 
 ---
