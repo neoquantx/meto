@@ -1,26 +1,24 @@
 import Link from "next/link";
 import { notFound } from "next/navigation";
+import { MeetingRoom } from "@/components/meeting-room";
 import { TranscriptionPanel } from "@/components/transcription-panel";
 import { buttonVariants } from "@/components/ui/button";
 import { parseOffRecordRanges } from "@/lib/capture-limits";
+import {
+  parseChapters,
+  parseTldr,
+  readCommitment,
+  readDecision,
+  readSegment,
+  readSpeaker,
+  type CommitmentRow,
+  type DecisionRow,
+  type SpeakerRow,
+  type TranscriptSegment,
+} from "@/lib/meeting-view";
+import { formatDuration } from "@/lib/playback";
 import { createAdminClient } from "@/lib/supabase/admin";
 import { getUserOrThrow } from "@/lib/supabase/server";
-
-function formatClock(seconds: number) {
-  const total = Math.max(0, Math.round(seconds));
-  const minutes = Math.floor(total / 60);
-  const rest = total % 60;
-  return `${minutes}:${String(rest).padStart(2, "0")}`;
-}
-
-function formatMs(ms: number) {
-  const total = Math.max(0, Math.floor(ms / 1000));
-  const hours = Math.floor(total / 3600);
-  const minutes = Math.floor((total % 3600) / 60);
-  const seconds = total % 60;
-  const clock = `${minutes}:${String(seconds).padStart(2, "0")}`;
-  return hours > 0 ? `${hours}:${String(minutes).padStart(2, "0")}:${String(seconds).padStart(2, "0")}` : clock;
-}
 
 const sourceLabel = {
   mic: "Microphone",
@@ -28,7 +26,23 @@ const sourceLabel = {
   upload: "Upload",
 } as const;
 
-const TRANSCRIBED = new Set(["transcribed", "extracting", "ready"]);
+const WITH_TRANSCRIPT = new Set(["transcribed", "extracting", "ready", "failed"]);
+const SPEECH_CHECKED = new Set(["transcribed", "extracting", "ready"]);
+
+function rows<T>(data: unknown[] | null, read: (row: unknown) => T | null) {
+  const parsed: T[] = [];
+  for (const row of data ?? []) {
+    const item = read(row);
+    if (item) parsed.push(item);
+  }
+  return parsed;
+}
+
+function recordedLabel(value: string) {
+  const date = new Date(value);
+  if (Number.isNaN(date.getTime())) return value;
+  return `${date.toISOString().replace("T", " ").slice(0, 16)} UTC`;
+}
 
 export default async function MeetingPage({
   params,
@@ -41,7 +55,7 @@ export default async function MeetingPage({
   const { data: meeting, error } = await admin
     .from("meetings")
     .select(
-      "id, title, status, error, recorded_at, duration_sec, source, mime_type, audio_path, off_record_ranges",
+      "id, title, status, error, recorded_at, duration_sec, source, mime_type, audio_path, off_record_ranges, dropped_count, tldr, chapters",
     )
     .eq("id", id)
     .eq("owner_id", user.id)
@@ -72,82 +86,104 @@ export default async function MeetingPage({
     }
   }
 
-  let segments: {
-    idx: number;
-    speaker: number;
-    start_ms: number;
-    text: string;
-  }[] = [];
-  let segmentError: string | null = null;
-  if (TRANSCRIBED.has(meeting.status)) {
-    const { data, error: segmentsError } = await admin
-      .from("segments")
-      .select("idx, speaker, start_ms, text")
-      .eq("meeting_id", id)
-      .order("idx", { ascending: true });
-    if (segmentsError) segmentError = segmentsError.message;
-    else segments = data ?? [];
+  let segments: TranscriptSegment[] = [];
+  let speakers: SpeakerRow[] = [];
+  let loadError: string | null = null;
+  if (WITH_TRANSCRIPT.has(meeting.status)) {
+    const [segmentResult, speakerResult] = await Promise.all([
+      admin
+        .from("segments")
+        .select("idx, speaker, start_ms, end_ms, text")
+        .eq("meeting_id", id)
+        .order("idx", { ascending: true }),
+      admin
+        .from("meeting_speakers")
+        .select("speaker, name_hint, person:people(name)")
+        .eq("meeting_id", id)
+        .order("speaker", { ascending: true }),
+    ]);
+    if (segmentResult.error) loadError = segmentResult.error.message;
+    else segments = rows(segmentResult.data, readSegment);
+    if (speakerResult.error) loadError = speakerResult.error.message;
+    else speakers = rows(speakerResult.data, readSpeaker);
   }
 
+  let decisions: DecisionRow[] = [];
+  let commitments: CommitmentRow[] = [];
+  if (meeting.status === "ready") {
+    const [decisionResult, commitmentResult] = await Promise.all([
+      admin
+        .from("decisions")
+        .select("id, text, quote, start_ms, segment_idx, review")
+        .eq("meeting_id", id)
+        .eq("owner_id", user.id)
+        .order("start_ms", { ascending: true }),
+      admin
+        .from("commitments")
+        .select(
+          "id, text, quote, kind, condition, due_date, start_ms, segment_idx, review, status, owner_speaker, owner:people(name)",
+        )
+        .eq("meeting_id", id)
+        .eq("owner_id", user.id)
+        .order("start_ms", { ascending: true }),
+    ]);
+    if (decisionResult.error) loadError = decisionResult.error.message;
+    else decisions = rows(decisionResult.data, readDecision);
+    if (commitmentResult.error) loadError = commitmentResult.error.message;
+    else commitments = rows(commitmentResult.data, readCommitment);
+  }
+
+  const ready = meeting.status === "ready";
+  const showRoom = Boolean(playbackUrl) || segments.length > 0 || speakers.length > 0 || ready;
   const video = typeof meeting.mime_type === "string" && meeting.mime_type.startsWith("video/");
-  const pauses = parseOffRecordRanges(meeting.off_record_ranges);
   const source = sourceLabel[meeting.source as keyof typeof sourceLabel] ?? meeting.source;
 
   return (
-    <section className="max-w-2xl">
-      <h1 className="text-2xl font-semibold tracking-tight">{meeting.title}</h1>
-      <p className="mt-2 text-sm text-muted-foreground">
-        {source}
-        {meeting.duration_sec ? ` · ${formatClock(meeting.duration_sec)}` : ""}
-      </p>
-      <p className="mt-1 text-sm text-muted-foreground">
-        Recorded {new Date(meeting.recorded_at).toISOString().replace("T", " ").slice(0, 16)} UTC
-      </p>
-      <div className="mt-6">
-        <TranscriptionPanel
-          key={`${meeting.status}:${meeting.error ?? ""}`}
-          meetingId={meeting.id}
-          status={meeting.status}
-          error={meeting.error}
-          hasAudio={hasAudio}
-        />
+    <section>
+      <div className="flex flex-wrap items-start justify-between gap-4">
+        <div>
+          <h1 className="text-2xl font-semibold tracking-tight">{meeting.title}</h1>
+          <p className="mt-2 text-sm text-muted-foreground">
+            {source}
+            {meeting.duration_sec ? ` · ${formatDuration(meeting.duration_sec)}` : ""}
+          </p>
+          <p className="mt-1 text-sm text-muted-foreground">Recorded {recordedLabel(meeting.recorded_at)}</p>
+        </div>
+        <Link href="/meetings/new" className={buttonVariants({ variant: "outline" })}>
+          New meeting
+        </Link>
       </div>
-      {playbackUrl ? (
-        <div className="mt-6">
-          {video ? (
-            <video controls src={playbackUrl} className="w-full rounded-lg" />
-          ) : (
-            <audio controls src={playbackUrl} className="w-full" />
-          )}
+      {meeting.status !== "ready" ? (
+        <div className="mt-6 max-w-2xl">
+          <TranscriptionPanel
+            key={`${meeting.status}:${meeting.error ?? ""}`}
+            meetingId={meeting.id}
+            status={meeting.status}
+            error={meeting.error}
+            hasAudio={hasAudio}
+          />
         </div>
       ) : null}
-      {segmentError ? <p className="mt-6 text-sm text-destructive">{segmentError}</p> : null}
-      {TRANSCRIBED.has(meeting.status) && !segmentError && segments.length === 0 ? (
-        <p className="mt-6 text-sm text-muted-foreground">No speech was detected.</p>
-      ) : null}
-      {segments.length > 0 ? (
-        <div className="mt-6">
-          <h2 className="text-lg font-medium">Transcript</h2>
-          <ol className="mt-3 space-y-3">
-            {segments.map((segment) => (
-              <li key={segment.idx}>
-                <p className="text-xs text-muted-foreground">
-                  {formatMs(segment.start_ms)} · Speaker {segment.speaker}
-                </p>
-                <p className="text-sm">{segment.text}</p>
-              </li>
-            ))}
-          </ol>
+      {loadError ? <p className="mt-6 text-sm text-destructive">{loadError}</p> : null}
+      {showRoom ? (
+        <div className="mt-8">
+          <MeetingRoom
+            meetingId={meeting.id}
+            playbackUrl={playbackUrl}
+            video={video}
+            segments={segments}
+            pauses={parseOffRecordRanges(meeting.off_record_ranges)}
+            speakers={speakers}
+            speechChecked={SPEECH_CHECKED.has(meeting.status) && !loadError}
+            ready={ready}
+            tldr={parseTldr(meeting.tldr)}
+            chapters={parseChapters(meeting.chapters)}
+            decisions={decisions}
+            commitments={commitments}
+            droppedCount={Number(meeting.dropped_count ?? 0)}
+          />
         </div>
       ) : null}
-      {pauses.length > 0 ? (
-        <p className="mt-4 text-sm text-muted-foreground">
-          Off the record: {pauses.length} {pauses.length === 1 ? "pause" : "pauses"} saved.
-        </p>
-      ) : null}
-      <Link href="/meetings/new" className={`${buttonVariants({ variant: "outline" })} mt-6`}>
-        New meeting
-      </Link>
     </section>
   );
 }

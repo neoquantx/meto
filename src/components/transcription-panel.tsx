@@ -5,8 +5,11 @@ import { useRouter } from "next/navigation";
 import { Button } from "@/components/ui/button";
 import {
   processingStepMark,
+  shouldAutoExtract,
   shouldAutoTranscribe,
+  shouldPollExtraction,
   shouldPollTranscription,
+  showExtractionRetry,
   showTranscriptionRetry,
   type StepId,
   type StepMark,
@@ -16,6 +19,7 @@ const STEPS: { id: StepId; label: string }[] = [
   { id: "uploaded", label: "Uploaded" },
   { id: "transcribing", label: "Transcribing" },
   { id: "transcribed", label: "Transcribed" },
+  { id: "extracting", label: "Extracting" },
 ];
 
 const MARK_LABEL: Record<StepMark, string> = {
@@ -29,11 +33,12 @@ type RunResult = { ok: true; status: string } | { ok: false; error: string };
 
 const inflight = new Map<string, Promise<RunResult>>();
 
-function runTranscribe(meetingId: string) {
-  const existing = inflight.get(meetingId);
+function runStep(meetingId: string, step: "transcribe" | "extract") {
+  const key = `${meetingId}:${step}`;
+  const existing = inflight.get(key);
   if (existing) return existing;
 
-  const promise = fetch(`/api/meetings/${meetingId}/transcribe`, { method: "POST" })
+  const promise = fetch(`/api/meetings/${meetingId}/${step}`, { method: "POST" })
     .then(async (response) => {
       let body: { error?: string; status?: string } = {};
       try {
@@ -42,16 +47,21 @@ function runTranscribe(meetingId: string) {
         body = {};
       }
       if (!response.ok) {
-        return { ok: false as const, error: body.error || "Transcription failed. Try again." };
+        const fallback = step === "extract" ? "Extraction failed. Try again." : "Transcription failed. Try again.";
+        return { ok: false as const, error: body.error || fallback };
       }
-      return { ok: true as const, status: body.status || "transcribed" };
+      const done = step === "extract" ? "ready" : "transcribed";
+      return { ok: true as const, status: body.status || done };
     })
-    .catch(() => ({ ok: false as const, error: "Transcription failed. Try again." }))
+    .catch(() => {
+      const fallback = step === "extract" ? "Extraction failed. Try again." : "Transcription failed. Try again.";
+      return { ok: false as const, error: fallback };
+    })
     .finally(() => {
-      inflight.delete(meetingId);
+      inflight.delete(key);
     });
 
-  inflight.set(meetingId, promise);
+  inflight.set(key, promise);
   return promise;
 }
 
@@ -68,15 +78,22 @@ export function TranscriptionPanel({
 }) {
   const router = useRouter();
   const [override, setOverride] = useState<{ status: string; error: string | null } | null>(null);
-  const [busy, setBusy] = useState(initialStatus === "uploaded");
+  const starting =
+    initialStatus === "uploaded" ? "transcribing" : initialStatus === "transcribed" ? "extracting" : null;
+  const [busy, setBusy] = useState(starting !== null);
   const [stalled, setStalled] = useState(false);
-  const status = override?.status ?? (initialStatus === "uploaded" ? "transcribing" : initialStatus);
+  const status = override?.status ?? starting ?? initialStatus;
   const error = override ? override.error : initialError;
 
   useEffect(() => {
-    if (!shouldAutoTranscribe(initialStatus)) return;
+    const step = shouldAutoTranscribe(initialStatus)
+      ? "transcribe"
+      : shouldAutoExtract(initialStatus)
+        ? "extract"
+        : null;
+    if (!step) return;
     let cancelled = false;
-    void runTranscribe(meetingId).then((result) => {
+    void runStep(meetingId, step).then((result) => {
       if (cancelled) return;
       if (!result.ok) setOverride({ status: "failed", error: result.error });
       else setOverride({ status: result.status, error: null });
@@ -89,26 +106,31 @@ export function TranscriptionPanel({
   }, [initialStatus, meetingId, router]);
 
   useEffect(() => {
-    if (!shouldPollTranscription(initialStatus) || override) return;
+    if (override) return;
+    const pollingTranscription = shouldPollTranscription(initialStatus);
+    const pollingExtraction = shouldPollExtraction(initialStatus);
+    if (!pollingTranscription && !pollingExtraction) return;
     const poll = window.setInterval(() => router.refresh(), 4000);
-    const stall = window.setTimeout(() => setStalled(true), 20_000);
+    const stall = window.setTimeout(() => setStalled(true), pollingExtraction ? 60_000 : 20_000);
     return () => {
       window.clearInterval(poll);
       window.clearTimeout(stall);
     };
   }, [initialStatus, override, router]);
 
-  async function retry() {
+  async function retry(step: "transcribe" | "extract") {
     setBusy(true);
-    setOverride({ status: "transcribing", error: null });
-    const result = await runTranscribe(meetingId);
+    setStalled(false);
+    setOverride({ status: step === "extract" ? "extracting" : "transcribing", error: null });
+    const result = await runStep(meetingId, step);
     if (!result.ok) setOverride({ status: "failed", error: result.error });
     else setOverride({ status: result.status, error: null });
     setBusy(false);
     router.refresh();
   }
 
-  const showRetry = showTranscriptionRetry({ status, hasAudio, busy, stalled });
+  const extractionRetry = showExtractionRetry({ status, error, busy, stalled });
+  const transcriptionRetry = showTranscriptionRetry({ status, hasAudio, busy, stalled, error });
 
   return (
     <div>
@@ -118,7 +140,7 @@ export function TranscriptionPanel({
       ) : (
         <ol className="mt-3 space-y-1 text-sm">
           {STEPS.map((step) => {
-            const mark = processingStepMark(step.id, status, hasAudio);
+            const mark = processingStepMark(step.id, status, hasAudio, error);
             return (
               <li
                 key={step.id}
@@ -140,12 +162,25 @@ export function TranscriptionPanel({
           Labeling speakers and timestamps. This page checks again every few seconds.
         </p>
       ) : null}
-      {status === "transcribed" || status === "extracting" || status === "ready" ? (
+      {status === "extracting" ? (
+        <p className="mt-3 text-sm text-muted-foreground">
+          Checking each quote against the transcript. This page checks again every few seconds.
+        </p>
+      ) : null}
+      {status === "transcribed" ? (
         <p className="mt-3 text-sm text-muted-foreground">Speaker labels and timestamps are saved.</p>
       ) : null}
+      {status === "ready" ? (
+        <p className="mt-3 text-sm text-muted-foreground">Decisions and commitments are saved.</p>
+      ) : null}
       {status === "failed" && error ? <p className="mt-3 text-sm text-destructive">{error}</p> : null}
-      {showRetry ? (
-        <Button className="mt-4" type="button" onClick={() => void retry()}>
+      {extractionRetry ? (
+        <Button className="mt-4" type="button" onClick={() => void retry("extract")}>
+          Retry
+        </Button>
+      ) : null}
+      {transcriptionRetry ? (
+        <Button className="mt-4" type="button" onClick={() => void retry("transcribe")}>
           Retry
         </Button>
       ) : null}
