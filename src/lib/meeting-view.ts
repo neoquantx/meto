@@ -26,6 +26,13 @@ export type DecisionRow = {
   review: ReviewState;
 };
 
+export type CommitmentHistory = {
+  line: string;
+  meetingId: string;
+  startMs: number | null;
+  segmentIdx: number | null;
+};
+
 export type CommitmentRow = {
   id: string;
   text: string;
@@ -33,12 +40,14 @@ export type CommitmentRow = {
   kind: CommitmentKind;
   condition: string | null;
   due_date: string | null;
+  change_note: string | null;
   start_ms: number;
   segment_idx: number;
   review: ReviewState;
   status: string;
   owner_speaker: number | null;
   owner_name: string | null;
+  history: CommitmentHistory[];
 };
 
 export type ChapterRow = {
@@ -244,11 +253,13 @@ export function readCommitment(row: unknown): CommitmentRow | null {
     kind,
     condition: condition || null,
     due_date: textField(record.due_date),
+    change_note: textField(record.change_note)?.trim() || null,
     start_ms: record.start_ms,
     segment_idx: record.segment_idx,
     review: readReview(record.review),
     status: textField(record.status) ?? "open",
     owner_speaker: typeof ownerSpeaker === "number" ? ownerSpeaker : null,
     owner_name: readPersonName(record.owner),
+    history: [],
   };
 }

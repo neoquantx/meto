@@ -1,10 +1,13 @@
 import { jsonError, requireApiUser } from "@/lib/http";
+import { LedgerError, runLedgerCheck } from "@/lib/ledger-check";
 import {
   commitmentOwnerUpdates,
   parseSpeakerSave,
   personNameKey,
 } from "@/lib/speakers";
 import { createAdminClient } from "@/lib/supabase/admin";
+
+export const maxDuration = 300;
 
 const NAMABLE = new Set(["transcribed", "extracting", "ready", "failed"]);
 
@@ -46,17 +49,43 @@ export async function POST(
     .eq("meeting_id", id);
   if (speakerError) return jsonError(speakerError.message, 500, "database");
 
-  const known = (speakerRows ?? []).map((row) => row.speaker);
-  const parsed = parseSpeakerSave(json, known);
-  if (!parsed.ok) return jsonError(parsed.error, 400, "bad_request");
+  const record = json && typeof json === "object" && !Array.isArray(json) ? (json as Record<string, unknown>) : null;
+  if (!record) return jsonError("The request body must be JSON.", 400, "bad_request");
+  const recheck = record.recheck === true;
+  const saving = "speakers" in record;
+  if (!saving && !recheck) return jsonError("Send a name for each speaker.", 400, "bad_request");
+
+  let names: { speaker: number; name: string | null }[] | null = null;
+  if (saving) {
+    const known = (speakerRows ?? []).map((row) => row.speaker);
+    const parsed = parseSpeakerSave(json, known);
+    if (!parsed.ok) return jsonError(parsed.error, 400, "bad_request");
+    try {
+      names = await saveNames(admin, auth.user.id, id, parsed.assignments);
+      await applyOwners(admin, auth.user.id, id);
+    } catch (error) {
+      const message = error instanceof Error ? error.message : "Could not save speaker names.";
+      return jsonError(message, 500, "database");
+    }
+  }
 
   try {
-    const names = await saveNames(admin, auth.user.id, id, parsed.assignments);
-    await applyOwners(admin, auth.user.id, id);
-    return Response.json({ ok: true, speakers: names });
+    const ledger = await runLedgerCheck(admin, { ownerId: auth.user.id, meetingId: id, force: recheck });
+    if (!names && !ledger.checked && ledger.reason === "unnamed") {
+      return jsonError("Name at least one speaker before checking the ledger.", 409, "unnamed");
+    }
+    if (!names && !ledger.checked && ledger.reason === "no_transcript") {
+      return jsonError("Transcribe the meeting before checking the ledger.", 409, "no_transcript");
+    }
+    return Response.json({ ok: true, speakers: names ?? undefined, ledger });
   } catch (error) {
-    const message = error instanceof Error ? error.message : "Could not save speaker names.";
-    return jsonError(message, 500, "database");
+    const message = error instanceof Error ? error.message : "Could not check the ledger.";
+    if (!names) {
+      const status = error instanceof LedgerError ? error.status : 500;
+      const code = error instanceof LedgerError ? error.code : "database";
+      return jsonError(message, status, code);
+    }
+    return Response.json({ ok: true, speakers: names, ledger: { checked: false, error: message } });
   }
 }
 

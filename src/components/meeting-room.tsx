@@ -14,6 +14,15 @@ import {
 import { activeSegmentAt, formatTimestamp } from "@/lib/playback";
 import { buildTranscriptMarkers } from "@/lib/transcript-gaps";
 
+function openingMoment(segments: TranscriptSegment[], startAtMs: number | null, startLine: number | null) {
+  if (startAtMs == null && startLine == null) return null;
+  const fromLine = startLine == null ? undefined : segments.find((segment) => segment.idx === startLine);
+  const ms = startAtMs ?? fromLine?.start_ms;
+  if (ms == null) return null;
+  const idx = startLine ?? activeSegmentAt(segments, ms);
+  return { ms, idx };
+}
+
 export function MeetingRoom({
   meetingId,
   playbackUrl,
@@ -21,6 +30,9 @@ export function MeetingRoom({
   segments,
   pauses,
   speakers,
+  ledgerChecked,
+  startAtMs,
+  startLine,
   speechChecked,
   ready,
   tldr,
@@ -35,6 +47,9 @@ export function MeetingRoom({
   segments: TranscriptSegment[];
   pauses: OffRecordRange[];
   speakers: SpeakerRow[];
+  ledgerChecked: boolean;
+  startAtMs: number | null;
+  startLine: number | null;
   speechChecked: boolean;
   ready: boolean;
   tldr: string[];
@@ -47,13 +62,15 @@ export function MeetingRoom({
   const videoRef = useRef<HTMLVideoElement | null>(null);
   const listRef = useRef<HTMLOListElement | null>(null);
   const rowRefs = useRef(new Map<number, HTMLLIElement>());
-  const [active, setActive] = useState<number | null>(null);
-  const [follow, setFollow] = useState(true);
-
   const ordered = useMemo(
     () => [...segments].sort((a, b) => a.start_ms - b.start_ms || a.idx - b.idx),
     [segments],
   );
+  const opening = useMemo(() => openingMoment(ordered, startAtMs, startLine), [ordered, startAtMs, startLine]);
+  const [active, setActive] = useState<number | null>(opening?.idx ?? null);
+  const [follow, setFollow] = useState(true);
+  const pendingMs = useRef<number | null>(opening?.ms ?? null);
+  const jumped = useRef(false);
   const markers = useMemo(() => buildTranscriptMarkers(ordered, pauses), [ordered, pauses]);
   const byIdx = useMemo(() => new Map(ordered.map((segment) => [segment.idx, segment])), [ordered]);
   const nameBySpeaker = useMemo(() => {
@@ -95,6 +112,24 @@ export function MeetingRoom({
     scrollRow(active);
   }, [active, follow]);
 
+  useEffect(() => {
+    if (jumped.current || !opening) return;
+    jumped.current = true;
+    pendingMs.current = opening.ms;
+    const element = video ? videoRef.current : audioRef.current;
+    if (!element || element.readyState < 1) return;
+    pendingMs.current = null;
+    element.currentTime = Math.max(0, opening.ms) / 1000;
+  }, [opening, video]);
+
+  function onLoadedMetadata() {
+    const ms = pendingMs.current;
+    if (ms == null) return;
+    pendingMs.current = null;
+    const element = video ? videoRef.current : audioRef.current;
+    if (element) element.currentTime = Math.max(0, ms) / 1000;
+  }
+
   function seek(ms: number, segmentIdx?: number) {
     const element = media();
     if (element && Number.isFinite(ms)) element.currentTime = Math.max(0, ms) / 1000;
@@ -117,6 +152,7 @@ export function MeetingRoom({
               className="w-full rounded-lg"
               onTimeUpdate={syncFromMedia}
               onSeeked={syncFromMedia}
+              onLoadedMetadata={onLoadedMetadata}
             />
           ) : (
             <audio
@@ -127,6 +163,7 @@ export function MeetingRoom({
               className="w-full"
               onTimeUpdate={syncFromMedia}
               onSeeked={syncFromMedia}
+              onLoadedMetadata={onLoadedMetadata}
             />
           )
         ) : (
@@ -207,6 +244,7 @@ export function MeetingRoom({
               key={speakers.map((speaker) => speaker.speaker).join(",")}
               meetingId={meetingId}
               speakers={speakers}
+              ledgerChecked={ledgerChecked}
             />
           ) : null}
           {ready ? (

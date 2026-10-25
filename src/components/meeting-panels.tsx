@@ -1,14 +1,17 @@
 "use client";
 
 import { useMemo, useRef, useState } from "react";
+import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { Button } from "@/components/ui/button";
+import { evidenceHref } from "@/lib/ledger-view";
 import {
   kindLabel,
   ownerLabel,
   statusLabel,
   whoOwesWhat,
   type ChapterRow,
+  type CommitmentHistory,
   type CommitmentRow,
   type DecisionRow,
   type ReviewState,
@@ -30,62 +33,79 @@ async function errorMessage(response: Response, fallback: string) {
   return fallback;
 }
 
+type LedgerPayload = {
+  checked?: boolean;
+  updated?: number;
+  error?: string;
+};
+
 export function SpeakerPanel({
   meetingId,
   speakers,
+  ledgerChecked,
 }: {
   meetingId: string;
   speakers: SpeakerRow[];
+  ledgerChecked: boolean;
 }) {
   const router = useRouter();
   const [drafts, setDrafts] = useState<Record<number, string>>(() =>
     Object.fromEntries(speakers.map((speaker) => [speaker.speaker, speaker.name ?? ""])),
   );
-  const [saving, setSaving] = useState(false);
-  const [saved, setSaved] = useState(false);
+  const [busy, setBusy] = useState<"save" | "recheck" | null>(null);
+  const [note, setNote] = useState<string | null>(null);
   const [error, setError] = useState<string | null>(null);
+  const [checked, setChecked] = useState(ledgerChecked);
+
+  async function post(body: unknown, mode: "save" | "recheck") {
+    setBusy(mode);
+    setNote(null);
+    setError(null);
+    try {
+      const response = await fetch(`/api/meetings/${meetingId}/speakers`, {
+        method: "POST",
+        headers: { "content-type": "application/json" },
+        body: JSON.stringify(body),
+      });
+      const payload = (await response.json().catch(() => null)) as {
+        error?: string;
+        speakers?: { speaker: number; name: string | null }[];
+        ledger?: LedgerPayload;
+      } | null;
+      if (!response.ok) {
+        setError(payload?.error ?? (mode === "save" ? "Could not save speaker names." : "Could not check the ledger."));
+        setBusy(null);
+        return;
+      }
+      if (payload?.speakers) {
+        setDrafts((current) => {
+          const next = { ...current };
+          for (const speaker of payload.speakers ?? []) next[speaker.speaker] = speaker.name ?? "";
+          return next;
+        });
+      }
+      if (payload?.ledger?.checked) setChecked(true);
+      setNote(ledgerNote(payload?.ledger, mode === "save"));
+      setBusy(null);
+      router.refresh();
+    } catch {
+      setError(mode === "save" ? "Could not save speaker names." : "Could not check the ledger.");
+      setBusy(null);
+    }
+  }
 
   async function save() {
-    setSaving(true);
-    setSaved(false);
-    setError(null);
     const payload: { speaker: number; name: string }[] = [];
     for (const speaker of speakers) {
       const normalized = normalizePersonName(drafts[speaker.speaker] ?? "");
       if (!normalized.ok) {
         setError(normalized.error);
-        setSaving(false);
+        setNote(null);
         return;
       }
       payload.push({ speaker: speaker.speaker, name: normalized.name ?? "" });
     }
-
-    try {
-      const response = await fetch(`/api/meetings/${meetingId}/speakers`, {
-        method: "POST",
-        headers: { "content-type": "application/json" },
-        body: JSON.stringify({ speakers: payload }),
-      });
-      if (!response.ok) {
-        setError(await errorMessage(response, "Could not save speaker names."));
-        setSaving(false);
-        return;
-      }
-      const body = (await response.json()) as { speakers?: { speaker: number; name: string | null }[] };
-      if (body.speakers) {
-        setDrafts((current) => {
-          const next = { ...current };
-          for (const speaker of body.speakers ?? []) next[speaker.speaker] = speaker.name ?? "";
-          return next;
-        });
-      }
-      setSaved(true);
-      setSaving(false);
-      router.refresh();
-    } catch {
-      setError("Could not save speaker names.");
-      setSaving(false);
-    }
+    await post({ speakers: payload }, "save");
   }
 
   return (
@@ -113,7 +133,7 @@ export function SpeakerPanel({
                 maxLength={80}
                 placeholder="Name"
                 onChange={(event) => {
-                  setSaved(false);
+                  setNote(null);
                   setDrafts((current) => ({ ...current, [speaker.speaker]: event.target.value }));
                 }}
               />
@@ -124,7 +144,7 @@ export function SpeakerPanel({
                   variant="outline"
                   size="sm"
                   onClick={() => {
-                    setSaved(false);
+                    setNote(null);
                     setDrafts((current) => ({ ...current, [speaker.speaker]: hint }));
                   }}
                 >
@@ -135,13 +155,30 @@ export function SpeakerPanel({
           );
         })}
       </ul>
-      <Button className="mt-4" type="button" disabled={saving} onClick={() => void save()}>
-        {saving ? "Saving…" : "Save names"}
-      </Button>
-      {saved ? <p className="mt-2 text-sm text-muted-foreground">Saved.</p> : null}
+      <div className="mt-4 flex flex-wrap gap-2">
+        <Button type="button" disabled={busy !== null} onClick={() => void save()}>
+          {busy === "save" ? (checked ? "Saving…" : "Checking ledger…") : "Save names"}
+        </Button>
+        <Button type="button" variant="outline" disabled={busy !== null} onClick={() => void post({ recheck: true }, "recheck")}>
+          {busy === "recheck" ? "Checking…" : "Re-check ledger"}
+        </Button>
+      </div>
+      {note ? <p className="mt-2 text-sm text-muted-foreground">{note}</p> : null}
       {error ? <p className="mt-2 text-sm text-destructive">{error}</p> : null}
     </section>
   );
+}
+
+function ledgerNote(ledger: LedgerPayload | undefined, savedNames: boolean) {
+  if (!ledger) return savedNames ? "Names saved." : null;
+  if (ledger.error) return savedNames ? `Names saved. ${ledger.error}` : ledger.error;
+  if (ledger.checked) {
+    const detail = ledger.updated
+      ? "Ledger checked."
+      : "Ledger checked. Nothing earlier was open for these people.";
+    return savedNames ? `Names saved. ${detail}` : detail;
+  }
+  return savedNames ? "Names saved." : null;
 }
 
 export function EvidencePanel({
@@ -159,7 +196,7 @@ export function EvidencePanel({
   decisions: DecisionRow[];
   commitments: CommitmentRow[];
   droppedCount: number;
-  onSeek: (ms: number, segmentIdx: number) => void;
+  onSeek: (ms: number, segmentIdx?: number) => void;
 }) {
   const owed = useMemo(() => whoOwesWhat(commitments), [commitments]);
 
@@ -225,11 +262,23 @@ export function EvidencePanel({
                   {item.due_date ? (
                     <p className="mt-1 text-sm text-muted-foreground">Due {item.due_date}</p>
                   ) : null}
+                  {item.change_note ? (
+                    <p className="mt-1 text-sm text-muted-foreground">{item.change_note}</p>
+                  ) : null}
                   <QuoteChip
                     quote={item.quote}
                     startMs={item.start_ms}
                     onSeek={() => onSeek(item.start_ms, item.segment_idx)}
                   />
+                  {item.history.length > 0 ? (
+                    <ul className="mt-2 space-y-1">
+                      {item.history.map((event, index) => (
+                        <li key={`${event.meetingId}-${index}`}>
+                          <HistoryLine event={event} meetingId={meetingId} onSeek={onSeek} />
+                        </li>
+                      ))}
+                    </ul>
+                  ) : null}
                   <ReviewButtons meetingId={meetingId} target="commitment" id={item.id} review={item.review} />
                 </li>
               );
@@ -286,6 +335,34 @@ export function EvidencePanel({
         </p>
       ) : null}
     </div>
+  );
+}
+
+function HistoryLine({
+  event,
+  meetingId,
+  onSeek,
+}: {
+  event: CommitmentHistory;
+  meetingId: string;
+  onSeek: (ms: number, segmentIdx?: number) => void;
+}) {
+  const className = "text-xs text-muted-foreground underline-offset-4 hover:underline";
+  if (event.meetingId === meetingId && event.startMs != null) {
+    return (
+      <button
+        type="button"
+        className={`${className} text-left`}
+        onClick={() => onSeek(event.startMs ?? 0, event.segmentIdx ?? undefined)}
+      >
+        {event.line}
+      </button>
+    );
+  }
+  return (
+    <Link className={className} href={evidenceHref(event.meetingId, event.startMs, event.segmentIdx)}>
+      {event.line}
+    </Link>
   );
 }
 

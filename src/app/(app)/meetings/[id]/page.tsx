@@ -16,6 +16,8 @@ import {
   type SpeakerRow,
   type TranscriptSegment,
 } from "@/lib/meeting-view";
+import { loadCommitmentHistory } from "@/lib/ledger-data";
+import { parseEvidenceQuery } from "@/lib/ledger-view";
 import { formatDuration } from "@/lib/playback";
 import { createAdminClient } from "@/lib/supabase/admin";
 import { getUserOrThrow } from "@/lib/supabase/server";
@@ -38,6 +40,10 @@ function rows<T>(data: unknown[] | null, read: (row: unknown) => T | null) {
   return parsed;
 }
 
+function firstQuery(value: string | string[] | undefined) {
+  return Array.isArray(value) ? value[0] : value;
+}
+
 function recordedLabel(value: string) {
   const date = new Date(value);
   if (Number.isNaN(date.getTime())) return value;
@@ -46,16 +52,20 @@ function recordedLabel(value: string) {
 
 export default async function MeetingPage({
   params,
+  searchParams,
 }: {
   params: Promise<{ id: string }>;
+  searchParams: Promise<{ t?: string | string[]; line?: string | string[] }>;
 }) {
   const { id } = await params;
+  const query = await searchParams;
+  const seek = parseEvidenceQuery(firstQuery(query.t), firstQuery(query.line));
   const user = await getUserOrThrow();
   const admin = createAdminClient();
   const { data: meeting, error } = await admin
     .from("meetings")
     .select(
-      "id, title, status, error, recorded_at, duration_sec, source, mime_type, audio_path, off_record_ranges, dropped_count, tldr, chapters",
+      "id, title, status, error, recorded_at, duration_sec, source, mime_type, audio_path, off_record_ranges, dropped_count, tldr, chapters, ledger_checked_at",
     )
     .eq("id", id)
     .eq("owner_id", user.id)
@@ -121,7 +131,7 @@ export default async function MeetingPage({
       admin
         .from("commitments")
         .select(
-          "id, text, quote, kind, condition, due_date, start_ms, segment_idx, review, status, owner_speaker, owner:people(name)",
+          "id, text, quote, kind, condition, due_date, change_note, start_ms, segment_idx, review, status, owner_speaker, owner:people(name)",
         )
         .eq("meeting_id", id)
         .eq("owner_id", user.id)
@@ -131,6 +141,17 @@ export default async function MeetingPage({
     else decisions = rows(decisionResult.data, readDecision);
     if (commitmentResult.error) loadError = commitmentResult.error.message;
     else commitments = rows(commitmentResult.data, readCommitment);
+    if (!loadError && commitments.length > 0) {
+      try {
+        const history = await loadCommitmentHistory(
+          admin,
+          commitments.map((item) => item.id),
+        );
+        commitments = commitments.map((item) => ({ ...item, history: history.get(item.id) ?? [] }));
+      } catch (historyError) {
+        loadError = historyError instanceof Error ? historyError.message : "Could not load ledger history.";
+      }
+    }
   }
 
   const ready = meeting.status === "ready";
@@ -174,6 +195,9 @@ export default async function MeetingPage({
             segments={segments}
             pauses={parseOffRecordRanges(meeting.off_record_ranges)}
             speakers={speakers}
+            ledgerChecked={Boolean(meeting.ledger_checked_at)}
+            startAtMs={seek.startAtMs}
+            startLine={seek.startLine}
             speechChecked={SPEECH_CHECKED.has(meeting.status) && !loadError}
             ready={ready}
             tldr={parseTldr(meeting.tldr)}
