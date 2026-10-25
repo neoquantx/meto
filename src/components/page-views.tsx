@@ -1,6 +1,22 @@
 import Link from "next/link";
 import { notFound } from "next/navigation";
 import { cn } from "cn";
+import {
+  ArrowLeft,
+  ArrowUpRight,
+  CalendarDays,
+  CheckCircle2,
+  ChevronRight,
+  CircleAlert,
+  Clock3,
+  FileAudio2,
+  Inbox,
+  Mic2,
+  Plus,
+  Search,
+  Sparkles,
+  Upload,
+} from "lucide-react";
 import { BriefBoard } from "@/components/brief-board";
 import { MeetingRoom } from "@/components/meeting-room";
 import { RecoverBanner } from "@/components/recover-banner";
@@ -64,7 +80,7 @@ import { readShareLink, sharePeople, type ShareLink } from "@/lib/share-view";
 import { createAdminClient } from "@/lib/supabase/admin";
 
 const fieldClass =
-  "h-8 min-w-0 flex-1 rounded-lg border bg-background px-3 text-sm outline-none focus-visible:border-ring focus-visible:ring-3 focus-visible:ring-ring/50";
+  "field min-w-0 flex-1";
 
 const sourceLabel = {
   mic: "Microphone",
@@ -197,9 +213,10 @@ export async function MeetingsView({
 
   if (loadError) {
     return (
-      <section>
-        <h1 className="text-2xl font-semibold tracking-tight">Meetings</h1>
-        <p className="mt-3 text-sm text-destructive">{loadError}</p>
+      <section className="surface p-6 sm:p-8">
+        <CircleAlert className="size-6 text-destructive" aria-hidden="true" />
+        <h1 className="mt-4 text-2xl font-semibold tracking-tight">Meetings could not load</h1>
+        <p className="mt-2 text-sm text-destructive">{loadError}</p>
       </section>
     );
   }
@@ -209,22 +226,28 @@ export async function MeetingsView({
     : [];
 
   return (
-    <section>
-      <div className="flex flex-wrap items-center justify-between gap-4">
+    <section className="mx-auto w-full max-w-6xl">
+      <div className="flex flex-col gap-5 sm:flex-row sm:items-end sm:justify-between">
         <div>
-          <h1 className="text-2xl font-semibold tracking-tight">Meetings</h1>
-          {readOnly ? (
-            <p className="mt-2 max-w-xl text-sm text-muted-foreground">
+          <p className="page-eyebrow">{readOnly ? "Product walkthrough" : "Your workspace"}</p>
+          <h1 className="page-title">Meetings</h1>
+          <p className="page-description">
+            {readOnly ? (
+              <>
               Three connected meetings between Himanshu and Rahul. Open a meeting or check the{" "}
-              <Link href="/demo/ledger" className="underline underline-offset-4">
+              <Link href="/demo/ledger" className="font-medium text-primary underline underline-offset-4">
                 Ledger
               </Link>{" "}
               to see how open promises are tracked across calls.
-            </p>
-          ) : null}
+              </>
+            ) : (
+              "Record, revisit, and search every conversation from one place."
+            )}
+          </p>
         </div>
         {!readOnly ? (
-          <Link href="/meetings/new" className={buttonVariants()}>
+          <Link href="/meetings/new" className={buttonVariants({ size: "lg" })}>
+            <Plus className="size-4" aria-hidden="true" />
             New meeting
           </Link>
         ) : null}
@@ -234,20 +257,24 @@ export async function MeetingsView({
           <RecoverBanner />
         </div>
       ) : null}
-      <form className="mt-6 flex flex-wrap gap-2" action={basePath} method="get">
+      <form className="surface mt-7 flex gap-2 p-2" action={basePath} method="get">
         <label className="sr-only" htmlFor="meeting-search">
           Search titles and transcripts
         </label>
-        <input
-          id="meeting-search"
-          className={fieldClass}
-          name="q"
-          defaultValue={query}
-          placeholder="Search titles and transcripts"
-          maxLength={200}
-        />
+        <div className="relative min-w-0 flex-1">
+          <Search className="pointer-events-none absolute left-3.5 top-1/2 size-4 -translate-y-1/2 text-muted-foreground" aria-hidden="true" />
+          <input
+            id="meeting-search"
+            className={`${fieldClass} border-transparent bg-transparent pl-10 shadow-none`}
+            name="q"
+            defaultValue={query}
+            placeholder="Search titles and transcripts"
+            maxLength={200}
+          />
+        </div>
         <button className={buttonVariants()} type="submit">
-          Search
+          <span className="hidden sm:inline">Search</span>
+          <Search className="size-4 sm:hidden" aria-hidden="true" />
         </button>
         {query ? (
           <Link href={basePath} className={buttonVariants({ variant: "outline" })}>
@@ -260,19 +287,35 @@ export async function MeetingsView({
       ) : null}
       {searchError ? <p className="mt-4 text-sm text-destructive">{searchError}</p> : null}
       {!searching && meetings.length === 0 ? (
-        <p className="mt-6 max-w-lg text-sm text-muted-foreground">
-          {readOnly
-            ? "No demo meetings have been added yet."
-            : "No meetings yet. Record one and it will show up here."}
-        </p>
+        <div className="surface mt-6 grid place-items-center px-6 py-16 text-center">
+          <Inbox className="size-9 text-muted-foreground/60" aria-hidden="true" />
+          <h2 className="mt-4 text-lg font-semibold">No meetings yet</h2>
+          <p className="mt-2 max-w-sm text-sm leading-6 text-muted-foreground">
+            {readOnly
+              ? "No demo meetings have been added yet."
+              : "Record or upload your first conversation. It will appear here once processing begins."}
+          </p>
+          {!readOnly ? (
+            <Link href="/meetings/new" className={cn(buttonVariants(), "mt-5")}>
+              <Plus className="size-4" aria-hidden="true" />
+              Create meeting
+            </Link>
+          ) : null}
+        </div>
       ) : null}
       {searching && !searchError && groups.length === 0 ? (
-        <p className="mt-6 text-sm text-muted-foreground">No meetings match that search.</p>
+        <div className="surface mt-6 grid place-items-center px-6 py-12 text-center">
+          <Search className="size-8 text-muted-foreground/60" aria-hidden="true" />
+          <p className="mt-3 text-sm font-medium">No meetings match “{query}”</p>
+          <Link href={basePath} className="mt-2 text-sm font-medium text-primary hover:underline">
+            Clear search
+          </Link>
+        </div>
       ) : null}
       {!searching ? (
-        <ul className="mt-6 space-y-3">
+        <ul className="mt-6 grid gap-3 md:grid-cols-2 xl:grid-cols-3">
           {meetings.map((meeting) => (
-            <li key={meeting.id} className="rounded-lg border p-3">
+            <li key={meeting.id} className="surface group transition-[border-color,box-shadow,transform] hover:-translate-y-0.5 hover:border-primary/25 hover:shadow-lg">
               <MeetingLine meeting={meeting} readOnly={readOnly} />
             </li>
           ))}
@@ -280,18 +323,21 @@ export async function MeetingsView({
       ) : (
         <ul className="mt-6 space-y-4">
           {groups.map((group) => (
-            <li key={group.meeting.id} className="rounded-lg border p-3">
+            <li key={group.meeting.id} className="surface p-1">
               <MeetingLine meeting={group.meeting} readOnly={readOnly} />
-              {group.titleMatch ? <p className="mt-2 text-xs text-muted-foreground">Title match</p> : null}
+              {group.titleMatch ? <p className="mx-4 mt-1 text-xs font-medium text-primary">Title match</p> : null}
               {group.snippets.length > 0 ? (
-                <ul className="mt-2 space-y-1">
+                <ul className="mx-2 mb-2 mt-2 space-y-1 border-t border-border/70 pt-2">
                   {group.snippets.map((snippet) => (
                     <li key={`${snippet.idx}-${snippet.startMs}`}>
                       <Link
-                        className="text-sm text-muted-foreground underline-offset-4 hover:underline break-words"
+                        className="flex items-start gap-2 rounded-lg px-2 py-2 text-sm leading-6 text-muted-foreground hover:bg-muted hover:text-foreground"
                         href={snippet.href}
                       >
-                        {formatTimestamp(snippet.startMs)} · {snippet.text}
+                        <span className="mt-0.5 shrink-0 rounded-md bg-primary/8 px-1.5 py-0.5 font-mono text-[0.68rem] font-medium text-primary">
+                          {formatTimestamp(snippet.startMs)}
+                        </span>
+                        <span className="break-words">{snippet.text}</span>
                       </Link>
                     </li>
                   ))}
@@ -318,18 +364,37 @@ function MeetingLine({
   readOnly: boolean;
 }) {
   const href = readOnly ? `/demo/meetings/${meeting.id}` : `/meetings/${meeting.id}`;
+  const Icon = meeting.source === "mic" ? Mic2 : meeting.source === "upload" ? Upload : FileAudio2;
   return (
-    <div>
-      <Link className="font-medium underline-offset-4 hover:underline break-words" href={href}>
+    <div className="relative flex min-h-34 flex-col p-4 sm:p-5">
+      <div className="flex items-start justify-between gap-3">
+        <span className="grid size-10 place-items-center rounded-xl bg-primary/8 text-primary">
+          <Icon className="size-4.5" aria-hidden="true" />
+        </span>
+        <span className="status-pill">
+          {meeting.status === "ready" ? (
+            <CheckCircle2 className="size-3 text-emerald-600" aria-hidden="true" />
+          ) : null}
+          {meetingStatusLabel(meeting.status)}
+        </span>
+      </div>
+      <Link className="mt-5 pr-8 font-semibold tracking-[-0.01em] break-words after:absolute after:inset-0" href={href}>
         {meeting.title}
       </Link>
-      <p className="mt-1 text-sm text-muted-foreground">
-        {formatMeetingWhen(meeting.recordedAt)}
-        {" · "}
-        {meetingSourceLabel(meeting.source)}
-        {meeting.durationSec ? ` · ${formatDuration(meeting.durationSec)}` : ""}
-        {meeting.status !== "ready" ? ` · ${meetingStatusLabel(meeting.status)}` : ""}
-      </p>
+      <div className="mt-2 flex flex-wrap items-center gap-x-3 gap-y-1 text-xs text-muted-foreground">
+        <span className="flex items-center gap-1.5">
+          <CalendarDays className="size-3.5" aria-hidden="true" />
+          {formatMeetingWhen(meeting.recordedAt)}
+        </span>
+        {meeting.durationSec ? (
+          <span className="flex items-center gap-1.5">
+            <Clock3 className="size-3.5" aria-hidden="true" />
+            {formatDuration(meeting.durationSec)}
+          </span>
+        ) : null}
+        <span className="sr-only">{meetingSourceLabel(meeting.source)}</span>
+      </div>
+      <ChevronRight className="absolute bottom-5 right-5 size-4 text-muted-foreground transition-transform group-hover:translate-x-0.5 group-hover:text-primary" aria-hidden="true" />
     </div>
   );
 }
@@ -357,23 +422,26 @@ export async function MeetingDetailView({
     if (!detail) notFound();
     const source = sourceLabel[detail.source] ?? detail.source;
     return (
-      <section>
-        <div className="flex flex-wrap items-start justify-between gap-4">
+      <section className="mx-auto w-full max-w-7xl">
+        <Link href="/demo/meetings" className="mb-6 inline-flex items-center gap-2 text-sm font-medium text-muted-foreground hover:text-foreground">
+          <ArrowLeft className="size-4" aria-hidden="true" />
+          Back to meetings
+        </Link>
+        <div className="flex flex-col gap-5 sm:flex-row sm:items-start sm:justify-between">
           <div>
-            <h1 className="text-2xl font-semibold tracking-tight break-words">{detail.title}</h1>
-            <p className="mt-2 text-sm text-muted-foreground">
-              {source}
-              {detail.durationSec ? ` · ${formatDuration(detail.durationSec)}` : ""}
-            </p>
-            <p className="mt-1 text-sm text-muted-foreground">
-              Recorded {recordedLabel(detail.recordedAt)}
-            </p>
+            <p className="page-eyebrow">Meeting record</p>
+            <h1 className="page-title break-words">{detail.title}</h1>
+            <div className="mt-4 flex flex-wrap gap-2">
+              <span className="status-pill"><Mic2 className="size-3" aria-hidden="true" />{source}</span>
+              {detail.durationSec ? <span className="status-pill"><Clock3 className="size-3" aria-hidden="true" />{formatDuration(detail.durationSec)}</span> : null}
+              <span className="status-pill"><CalendarDays className="size-3" aria-hidden="true" />{recordedLabel(detail.recordedAt)}</span>
+            </div>
           </div>
-          <Link href="/demo/meetings" className={buttonVariants({ variant: "outline" })}>
+          <Link href="/demo/meetings" className={buttonVariants({ variant: "outline", size: "lg" })}>
             All demo meetings
           </Link>
         </div>
-        <div className="mt-8">
+        <div className="mt-8 lg:mt-10">
           <MeetingRoom
             meetingId={detail.id}
             playbackUrl={detail.playbackUrl}
@@ -522,22 +590,28 @@ export async function MeetingDetailView({
   const source = sourceLabel[meeting.source as keyof typeof sourceLabel] ?? meeting.source;
 
   return (
-    <section>
-      <div className="flex flex-wrap items-start justify-between gap-4">
+    <section className="mx-auto w-full max-w-7xl">
+      <Link href="/meetings" className="mb-6 inline-flex items-center gap-2 text-sm font-medium text-muted-foreground hover:text-foreground">
+        <ArrowLeft className="size-4" aria-hidden="true" />
+        Back to meetings
+      </Link>
+      <div className="flex flex-col gap-5 sm:flex-row sm:items-start sm:justify-between">
         <div>
-          <h1 className="text-2xl font-semibold tracking-tight break-words">{meeting.title}</h1>
-          <p className="mt-2 text-sm text-muted-foreground">
-            {source}
-            {meeting.duration_sec ? ` · ${formatDuration(meeting.duration_sec)}` : ""}
-          </p>
-          <p className="mt-1 text-sm text-muted-foreground">Recorded {recordedLabel(meeting.recorded_at)}</p>
+          <p className="page-eyebrow">Meeting record</p>
+          <h1 className="page-title break-words">{meeting.title}</h1>
+          <div className="mt-4 flex flex-wrap gap-2">
+            <span className="status-pill"><FileAudio2 className="size-3" aria-hidden="true" />{source}</span>
+            {meeting.duration_sec ? <span className="status-pill"><Clock3 className="size-3" aria-hidden="true" />{formatDuration(meeting.duration_sec)}</span> : null}
+            <span className="status-pill"><CalendarDays className="size-3" aria-hidden="true" />{recordedLabel(meeting.recorded_at)}</span>
+          </div>
         </div>
         {readOnly ? (
           <Link href="/demo/meetings" className={buttonVariants({ variant: "outline" })}>
             All demo meetings
           </Link>
         ) : (
-          <Link href="/meetings/new" className={buttonVariants({ variant: "outline" })}>
+          <Link href="/meetings/new" className={buttonVariants({ variant: "outline", size: "lg" })}>
+            <Plus className="size-4" aria-hidden="true" />
             New meeting
           </Link>
         )}
@@ -624,12 +698,13 @@ export async function LedgerView({
   const hasAny = items.some((item) => item.review !== "rejected" && item.kind !== "suggestion");
 
   return (
-    <section>
-      <h1 className="text-2xl font-semibold tracking-tight">Ledger</h1>
-      <p className="mt-3 max-w-xl text-muted-foreground">
+    <section className="mx-auto w-full max-w-6xl">
+      <p className="page-eyebrow">Follow-through</p>
+      <h1 className="page-title">Commitment ledger</h1>
+      <p className="page-description">
         Promises by person. A meeting only updates promises from earlier dates.
       </p>
-      <nav className="mt-6 flex flex-wrap gap-1" aria-label="Status">
+      <nav className="mt-7 flex max-w-full gap-1 overflow-x-auto rounded-xl border border-border/70 bg-card/70 p-1 shadow-xs [scrollbar-width:none] [&::-webkit-scrollbar]:hidden" aria-label="Status">
         {LEDGER_FILTERS.map(([status, label]) => {
           const active = status === filter;
           return (
@@ -638,9 +713,9 @@ export async function LedgerView({
               href={status === "all" ? basePath : `${basePath}?status=${status}`}
               aria-current={active ? "page" : undefined}
               className={cn(
-                "rounded-md px-2.5 py-1.5 text-sm",
+                "shrink-0 rounded-lg px-3.5 py-2 text-sm font-medium transition-colors",
                 active
-                  ? "bg-primary text-primary-foreground"
+                  ? "bg-primary text-primary-foreground shadow-sm"
                   : "text-muted-foreground hover:bg-muted hover:text-foreground",
               )}
             >
@@ -660,19 +735,27 @@ export async function LedgerView({
       {!loadError && hasAny && groups.length === 0 ? (
         <p className="mt-6 text-sm text-muted-foreground">Nothing in this filter.</p>
       ) : null}
-      <div className="mt-8 space-y-8">
+      <div className="mt-8 space-y-10">
         {groups.map((group) => (
           <section key={group.id}>
-            <h2 className="text-lg font-medium">{group.label}</h2>
-            <ul className="mt-3 space-y-3">
+            <div className="flex items-center gap-3">
+              <span className="grid size-9 place-items-center rounded-full bg-primary/10 text-sm font-semibold text-primary">
+                {group.label.slice(0, 1).toUpperCase()}
+              </span>
+              <div>
+                <h2 className="font-semibold">{group.label}</h2>
+                <p className="text-xs text-muted-foreground">{group.items.length} {group.items.length === 1 ? "commitment" : "commitments"}</p>
+              </div>
+            </div>
+            <ul className="mt-4 grid gap-3 lg:grid-cols-2">
               {group.items.map((item) => (
-                <li key={item.id} className="rounded-lg border p-3">
+                <li key={item.id} className="surface p-4 sm:p-5">
                   <p className="flex flex-wrap items-center gap-2 text-xs">
                     <span className="rounded-full border px-2 py-0.5">{ledgerStatusLabel(item.status)}</span>
                     <span className="rounded-full border px-2 py-0.5">{kindLabel(item.kind)}</span>
                     {item.dueDate ? <span className="text-muted-foreground">Due {item.dueDate}</span> : null}
                   </p>
-                  <p className="mt-2 text-sm break-words">{item.text}</p>
+                  <p className="mt-3 font-medium leading-6 break-words">{item.text}</p>
                   {item.condition ? (
                     <p className="mt-1 text-sm text-muted-foreground break-words">If {item.condition}</p>
                   ) : null}
@@ -680,18 +763,18 @@ export async function LedgerView({
                     <p className="mt-1 text-sm text-muted-foreground break-words">{item.changeNote}</p>
                   ) : null}
                   <Link
-                    className="mt-2 block text-xs text-muted-foreground underline-offset-4 hover:underline break-words"
+                    className="surface-muted mt-4 flex items-start gap-2 p-3 text-xs leading-5 text-muted-foreground transition-colors hover:border-primary/25 hover:text-foreground"
                     href={evidenceHref(item.meetingId, item.startMs, item.segmentIdx, { readOnly })}
                   >
-                    {item.meetingTitle}, {formatLedgerDate(item.recordedAt)} · {formatTimestamp(item.startMs)} · “
-                    {item.quote}”
+                    <ArrowUpRight className="mt-0.5 size-3.5 shrink-0 text-primary" aria-hidden="true" />
+                    <span className="break-words">{item.meetingTitle}, {formatLedgerDate(item.recordedAt)} · {formatTimestamp(item.startMs)} · “{item.quote}”</span>
                   </Link>
                   {item.history.length > 0 ? (
-                    <ul className="mt-2 space-y-1">
+                    <ul className="mt-3 space-y-2 border-l-2 border-primary/15 pl-3">
                       {item.history.map((event, index) => (
                         <li key={`${event.meetingId}-${index}`}>
                           <Link
-                            className="text-xs text-muted-foreground underline-offset-4 hover:underline break-words"
+                            className="text-xs leading-5 text-muted-foreground underline-offset-4 hover:text-primary hover:underline break-words"
                             href={evidenceHref(event.meetingId, event.startMs, event.segmentIdx, { readOnly })}
                           >
                             {event.line}
@@ -736,9 +819,10 @@ export async function DecisionsView({
   }
 
   return (
-    <section>
-      <h1 className="text-2xl font-semibold tracking-tight">Decisions</h1>
-      <p className="mt-3 max-w-xl text-muted-foreground">
+    <section className="mx-auto w-full max-w-5xl">
+      <p className="page-eyebrow">One source of truth</p>
+      <h1 className="page-title">Decisions</h1>
+      <p className="page-description">
         Decisions from {readOnly ? "the demo" : "your"} meetings, each with the line it came from.
       </p>
       {loadError ? <p className="mt-6 text-sm text-destructive">{loadError}</p> : null}
@@ -749,18 +833,24 @@ export async function DecisionsView({
             : "Decisions show up here after a meeting is processed."}
         </p>
       ) : null}
-      <ul className="mt-8 space-y-3">
+      <ul className="mt-8 grid gap-3 md:grid-cols-2">
         {decisions.map((item) => (
-          <li key={item.id} className="rounded-lg border p-3">
-            <p className="text-sm break-words">{item.text}</p>
+          <li key={item.id} className="surface flex flex-col p-4 sm:p-5">
+            <div className="flex items-center justify-between gap-3">
+              <span className="grid size-9 place-items-center rounded-xl bg-primary/8 text-primary">
+                <Sparkles className="size-4" aria-hidden="true" />
+              </span>
             {item.review === "confirmed" ? (
-              <p className="mt-1 text-xs text-muted-foreground">Confirmed</p>
+                <span className="status-pill"><CheckCircle2 className="size-3 text-emerald-600" aria-hidden="true" />Confirmed</span>
             ) : null}
+            </div>
+            <p className="mt-4 font-medium leading-6 break-words">{item.text}</p>
             <Link
-              className="mt-2 block text-xs text-muted-foreground underline-offset-4 hover:underline break-words"
+              className="surface-muted mt-5 flex items-start gap-2 p-3 text-xs leading-5 text-muted-foreground hover:border-primary/25 hover:text-foreground"
               href={evidenceHref(item.meetingId, item.startMs, item.segmentIdx, { readOnly })}
             >
-              {item.meetingTitle}, {formatLedgerDate(item.recordedAt)} · {formatTimestamp(item.startMs)} · “{item.quote}”
+              <ArrowUpRight className="mt-0.5 size-3.5 shrink-0 text-primary" aria-hidden="true" />
+              <span className="break-words">{item.meetingTitle}, {formatLedgerDate(item.recordedAt)} · {formatTimestamp(item.startMs)} · “{item.quote}”</span>
             </Link>
           </li>
         ))}
@@ -795,9 +885,10 @@ export async function BriefView({
   }
 
   return (
-    <section>
-      <h1 className="text-2xl font-semibold tracking-tight">Brief</h1>
-      <p className="mt-3 max-w-xl text-muted-foreground">
+    <section className="mx-auto w-full max-w-6xl">
+      <p className="page-eyebrow">Before your next call</p>
+      <h1 className="page-title">Pre-meeting brief</h1>
+      <p className="page-description">
         Pick who will be there. This lists what is already saved. It does not write a new summary.
       </p>
       {loadError ? <p className="mt-6 text-sm text-destructive">{loadError}</p> : null}

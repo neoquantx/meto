@@ -2,6 +2,16 @@
 
 import { useEffect, useRef, useState, useSyncExternalStore } from "react";
 import { useRouter } from "next/navigation";
+import {
+  ArrowLeft,
+  Check,
+  FileUp,
+  Mic2,
+  MonitorUp,
+  Pause,
+  ShieldCheck,
+  Square,
+} from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { useMeetingRecorder, type CaptureDetails } from "@/components/use-meeting-recorder";
 import {
@@ -16,7 +26,7 @@ import { getLiveSession, loadSession, subscribeLive } from "@/lib/recording-stor
 import { uploadMeetingBlob } from "@/lib/upload-meeting";
 
 const fieldClass =
-  "mt-1 w-full rounded-lg border bg-background px-3 py-2 text-sm outline-none focus-visible:border-ring focus-visible:ring-3 focus-visible:ring-ring/50";
+  "field mt-1.5";
 
 function subscribeMedia() {
   return () => undefined;
@@ -183,17 +193,22 @@ export function NewMeetingForm({
   return (
     <div className="space-y-6">
       {step === "consent" ? (
-        <div className="space-y-4">
-          <div>
-            <h2 className="text-lg font-medium">Consent</h2>
-            <p className="mt-1 text-sm text-muted-foreground">
+        <div className="surface overflow-hidden">
+          <div className="border-b border-border/70 bg-gradient-to-r from-primary/8 to-cyan-500/5 p-5 sm:p-6">
+            <span className="grid size-11 place-items-center rounded-2xl bg-primary text-primary-foreground shadow-md shadow-primary/20">
+              <ShieldCheck className="size-5" aria-hidden="true" />
+            </span>
+            <p className="mt-5 text-xs font-semibold tracking-[0.14em] text-primary uppercase">Step 1 of 2</p>
+            <h2 className="mt-1 text-xl font-semibold tracking-[-0.02em]">Confirm consent</h2>
+            <p className="mt-2 max-w-lg text-sm leading-6 text-muted-foreground">
               Recording stays off until everyone in the meeting has agreed.
             </p>
           </div>
-          <label className="flex items-start gap-3 text-sm">
+          <div className="space-y-5 p-5 sm:p-6">
+          <label className="flex cursor-pointer items-start gap-3 rounded-xl border border-border/80 bg-muted/35 p-4 text-sm leading-6 transition-colors hover:border-primary/25">
             <input
               type="checkbox"
-              className="mt-0.5 size-4 accent-current"
+              className="mt-1 size-4 accent-primary"
               checked={consented}
               onChange={(event) => setConsented(event.target.checked)}
             />
@@ -212,26 +227,38 @@ export function NewMeetingForm({
           </label>
           <Button
             type="button"
+            size="lg"
             disabled={!consented}
             onClick={() => {
               if (!when) setWhen(toDatetimeLocal(new Date()));
               setStep("details");
             }}
           >
+            <Check className="size-4" aria-hidden="true" />
             Continue
           </Button>
+          </div>
         </div>
       ) : null}
 
       {step === "details" ? (
-        <div className="space-y-5">
+        <div className="surface p-5 sm:p-6">
           <button
             type="button"
-            className="text-sm text-muted-foreground underline-offset-4 hover:underline"
+            className="mb-6 inline-flex items-center gap-2 text-sm font-medium text-muted-foreground hover:text-foreground"
             onClick={() => setStep("consent")}
           >
+            <ArrowLeft className="size-4" aria-hidden="true" />
             Back to consent
           </button>
+          <div className="mb-6">
+            <p className="text-xs font-semibold tracking-[0.14em] text-primary uppercase">Step 2 of 2</p>
+            <h2 className="mt-1 text-xl font-semibold tracking-[-0.02em]">Set up your meeting</h2>
+            <p className="mt-2 text-sm leading-6 text-muted-foreground">
+              Choose how to capture audio. Processing starts automatically after upload.
+            </p>
+          </div>
+          <div className="space-y-5">
           <label className="block text-sm font-medium">
             Title
             <input
@@ -274,9 +301,9 @@ export function NewMeetingForm({
           </label>
 
           {recording || recorder.phase === "uploading" ? (
-            <div className="space-y-4 rounded-lg border p-4">
+            <div className="space-y-4 rounded-2xl border border-primary/20 bg-primary/5 p-4 sm:p-5">
               <div className="flex items-baseline justify-between gap-4">
-                <p className="font-mono text-3xl tabular-nums">{formatClock(recorder.elapsedMs)}</p>
+                <p className="font-mono text-4xl font-semibold tracking-[-0.04em] tabular-nums">{formatClock(recorder.elapsedMs)}</p>
                 <p className="text-sm text-muted-foreground">
                   {recorder.phase === "paused"
                     ? "Off the record"
@@ -308,6 +335,7 @@ export function NewMeetingForm({
               <div className="flex flex-wrap gap-2">
                 {recorder.phase === "recording" ? (
                   <Button type="button" variant="outline" onClick={recorder.pause}>
+                    <Pause className="size-4" aria-hidden="true" />
                     Off the record
                   </Button>
                 ) : null}
@@ -317,24 +345,38 @@ export function NewMeetingForm({
                   </Button>
                 ) : null}
                 <Button type="button" disabled={recorder.phase === "uploading"} onClick={recorder.stop}>
+                  <Square className="size-3.5 fill-current" aria-hidden="true" />
                   {recorder.phase === "uploading" ? "Uploading…" : "Stop and upload"}
                 </Button>
               </div>
             </div>
           ) : (
-            <div className="space-y-3">
-              <div className="flex flex-wrap gap-2">
-                <Button type="button" disabled={fileBusy || blocked} onClick={onMic}>
-                  Record with microphone
+            <div className="space-y-4">
+              <div className="grid gap-3 sm:grid-cols-2">
+                <Button className="h-auto justify-start p-4 text-left" type="button" variant="outline" disabled={fileBusy || blocked} onClick={onMic}>
+                  <span className="grid size-9 place-items-center rounded-xl bg-primary/10 text-primary">
+                    <Mic2 className="size-4" aria-hidden="true" />
+                  </span>
+                  <span>
+                    <span className="block">Microphone</span>
+                    <span className="mt-0.5 block text-xs font-normal text-muted-foreground">In-person or phone call</span>
+                  </span>
                 </Button>
                 {supportsTab ? (
                   <Button
                     type="button"
                     variant="outline"
+                    className="h-auto justify-start p-4 text-left"
                     disabled={fileBusy || blocked}
                     onClick={onTab}
                   >
-                    Meeting tab + mic
+                    <span className="grid size-9 place-items-center rounded-xl bg-primary/10 text-primary">
+                      <MonitorUp className="size-4" aria-hidden="true" />
+                    </span>
+                    <span>
+                      <span className="block">Meeting tab + mic</span>
+                      <span className="mt-0.5 block text-xs font-normal text-muted-foreground">Chrome desktop, no bot</span>
+                    </span>
                   </Button>
                 ) : null}
               </div>
@@ -344,13 +386,16 @@ export function NewMeetingForm({
                   the call.
                 </p>
               ) : null}
-              <label className="block text-sm font-medium">
-                Or upload a file
+              <label className="block rounded-2xl border border-dashed border-border bg-muted/25 p-4 text-sm font-medium transition-colors hover:border-primary/35 hover:bg-primary/5 sm:p-5">
+                <span className="flex items-center gap-2">
+                  <FileUp className="size-4 text-primary" aria-hidden="true" />
+                  Or upload a file
+                </span>
                 <input
                   ref={fileRef}
                   type="file"
                   accept="audio/*,video/*"
-                  className="mt-1 block w-full text-sm"
+                  className="mt-3 block w-full text-sm file:mr-3 file:rounded-lg file:border-0 file:bg-primary file:px-3 file:py-2 file:text-xs file:font-semibold file:text-primary-foreground"
                   disabled={fileBusy || blocked}
                   onChange={(event) => {
                     const file = event.target.files?.[0];
@@ -365,10 +410,11 @@ export function NewMeetingForm({
               </label>
             </div>
           )}
+          </div>
         </div>
       ) : null}
 
-      {message ? <p className="text-sm text-destructive">{message}</p> : null}
+      {message ? <p className="rounded-xl border border-destructive/20 bg-destructive/5 p-3 text-sm text-destructive">{message}</p> : null}
     </div>
   );
 }

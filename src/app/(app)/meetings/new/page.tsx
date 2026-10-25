@@ -15,9 +15,10 @@ export default async function NewMeetingPage() {
   const settings = readSettings(data);
 
   return (
-    <section className="max-w-xl">
-      <h1 className="text-2xl font-semibold tracking-tight">New meeting</h1>
-      <p className="mt-2 text-muted-foreground">
+    <section className="mx-auto w-full max-w-3xl">
+      <p className="page-eyebrow">Capture a conversation</p>
+      <h1 className="page-title">New meeting</h1>
+      <p className="page-description">
         Record with the microphone or upload a file. On desktop Chrome you can also capture a
         meeting tab.
       </p>

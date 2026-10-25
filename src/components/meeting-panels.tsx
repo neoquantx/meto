@@ -3,6 +3,16 @@
 import { useMemo, useRef, useState } from "react";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
+import { cn } from "cn";
+import {
+  BookMarked,
+  CheckCircle2,
+  Gavel,
+  Lightbulb,
+  ListTodo,
+  Quote,
+  UsersRound,
+} from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { evidenceHref } from "@/lib/ledger-view";
 import {
@@ -21,7 +31,7 @@ import { formatTimestamp } from "@/lib/playback";
 import { normalizePersonName, personNameKey } from "@/lib/speakers";
 
 const fieldClass =
-  "mt-1 w-full rounded-lg border bg-background px-3 py-2 text-sm outline-none focus-visible:border-ring focus-visible:ring-3 focus-visible:ring-ring/50";
+  "field mt-1";
 
 async function errorMessage(response: Response, fallback: string) {
   try {
@@ -62,15 +72,23 @@ export function SpeakerPanel({
   if (readOnly) {
     return (
       <section>
-        <h2 className="text-lg font-medium">Speakers</h2>
-        <ul className="mt-3 space-y-2 text-sm">
+        <div className="flex items-center gap-2">
+          <UsersRound className="size-4 text-primary" aria-hidden="true" />
+          <h2 className="font-semibold">Speakers</h2>
+        </div>
+        <ul className="mt-4 grid gap-2 text-sm sm:grid-cols-2 xl:grid-cols-1 2xl:grid-cols-2">
           {speakers.map((speaker) => (
             <li
               key={speaker.speaker}
-              className="flex flex-wrap items-center justify-between gap-2 rounded-lg border px-3 py-2"
+              className="flex items-center gap-3 rounded-xl border border-border/70 bg-muted/35 px-3 py-2.5"
             >
-              <span className="text-muted-foreground">Speaker {speaker.speaker}</span>
-              <span className="font-medium">{speaker.name ?? "Unnamed"}</span>
+              <span className="grid size-8 place-items-center rounded-full bg-primary/10 text-xs font-semibold text-primary">
+                {(speaker.name ?? `S${speaker.speaker}`).slice(0, 1).toUpperCase()}
+              </span>
+              <span className="min-w-0">
+                <span className="block truncate font-medium">{speaker.name ?? "Unnamed"}</span>
+                <span className="block text-xs text-muted-foreground">Speaker {speaker.speaker}</span>
+              </span>
             </li>
           ))}
         </ul>
@@ -131,11 +149,14 @@ export function SpeakerPanel({
 
   return (
     <section>
-      <h2 className="text-lg font-medium">Speakers</h2>
+      <div className="flex items-center gap-2">
+        <UsersRound className="size-4 text-primary" aria-hidden="true" />
+        <h2 className="font-semibold">Speakers</h2>
+      </div>
       <p className="mt-1 text-sm text-muted-foreground">
         A suggested name is filled in only when you use it.
       </p>
-      <ul className="mt-3 space-y-4">
+      <ul className="mt-4 space-y-4">
         {speakers.map((speaker) => {
           const draft = drafts[speaker.speaker] ?? "";
           const normalized = normalizePersonName(draft);
@@ -224,28 +245,37 @@ export function EvidencePanel({
   const owed = useMemo(() => whoOwesWhat(commitments), [commitments]);
 
   return (
-    <div className="space-y-8">
+    <div className="space-y-9">
       {tldr.length > 0 ? (
         <section>
-          <h2 className="text-lg font-medium">TL;DR</h2>
-          <ul className="mt-2 list-disc space-y-1 pl-5 text-sm">
+          <div className="flex items-center gap-2">
+            <Lightbulb className="size-4 text-amber-500" aria-hidden="true" />
+            <h2 className="font-semibold">TL;DR</h2>
+          </div>
+          <ul className="mt-3 space-y-2">
             {tldr.map((line, index) => (
-              <li key={`${index}-${line}`} className="break-words">{line}</li>
+              <li key={`${index}-${line}`} className="flex gap-3 rounded-xl bg-amber-50/70 px-3 py-2.5 text-sm leading-6 text-amber-950 break-words">
+                <span className="mt-2 size-1.5 shrink-0 rounded-full bg-amber-500" />
+                <span>{line}</span>
+              </li>
             ))}
           </ul>
         </section>
       ) : null}
 
       <section>
-        <h2 className="text-lg font-medium">Who owes what</h2>
+        <div className="flex items-center gap-2">
+          <UsersRound className="size-4 text-primary" aria-hidden="true" />
+          <h2 className="font-semibold">Who owes what</h2>
+        </div>
         {owed.length === 0 ? (
           <p className="mt-2 text-sm text-muted-foreground">Nothing is owed from this meeting.</p>
         ) : (
-          <ul className="mt-3 space-y-4">
+          <ul className="mt-3 space-y-3">
             {owed.map((group) => (
-              <li key={group.id}>
-                <p className="text-sm font-medium">{group.label}</p>
-                <ul className="mt-1 space-y-1">
+              <li key={group.id} className="surface-muted p-3">
+                <p className="text-sm font-semibold">{group.label}</p>
+                <ul className="mt-2 space-y-2">
                   {group.items.map((item) => (
                     <li key={item.id} className="text-sm break-words">
                       <span className="mr-2 rounded-full border px-2 py-0.5 text-xs">
@@ -262,7 +292,15 @@ export function EvidencePanel({
       </section>
 
       <section>
-        <h2 className="text-lg font-medium">Commitments</h2>
+        <div className="flex items-center gap-2">
+          <ListTodo className="size-4 text-primary" aria-hidden="true" />
+          <h2 className="font-semibold">Commitments</h2>
+          {commitments.length > 0 ? (
+            <span className="ml-auto rounded-full bg-muted px-2 py-0.5 text-xs font-medium text-muted-foreground">
+              {commitments.length}
+            </span>
+          ) : null}
+        </div>
         {commitments.length === 0 ? (
           <p className="mt-2 text-sm text-muted-foreground">No commitments were found.</p>
         ) : (
@@ -270,15 +308,15 @@ export function EvidencePanel({
             {commitments.map((item) => {
               const state = statusLabel(item.status);
               return (
-                <li key={item.id} className="rounded-lg border p-3">
+                <li key={item.id} className="rounded-xl border border-border/80 bg-card p-4 shadow-xs">
                   <p className="flex flex-wrap items-center gap-2 text-xs">
-                    <span className="rounded-full border px-2 py-0.5">{kindLabel(item.kind)}</span>
+                    <span className="rounded-full border border-primary/15 bg-primary/5 px-2 py-0.5 font-medium text-primary">{kindLabel(item.kind)}</span>
                     <span className="text-muted-foreground">
                       {ownerLabel(item.owner_name, item.owner_speaker)}
                     </span>
-                    {state ? <span className="text-muted-foreground">{state}</span> : null}
+                    {state ? <span className={cn("ml-auto rounded-full px-2 py-0.5 font-medium", statusTone(item.status))}>{state}</span> : null}
                   </p>
-                  <p className="mt-2 text-sm break-words">{item.text}</p>
+                  <p className="mt-3 text-sm font-medium leading-6 break-words">{item.text}</p>
                   {item.condition ? (
                     <p className="mt-1 text-sm text-muted-foreground break-words">If {item.condition}</p>
                   ) : null}
@@ -294,7 +332,7 @@ export function EvidencePanel({
                     onSeek={() => onSeek(item.start_ms, item.segment_idx)}
                   />
                   {item.history.length > 0 ? (
-                    <ul className="mt-2 space-y-1">
+                    <ul className="mt-3 space-y-2 border-l-2 border-primary/15 pl-3">
                       {item.history.map((event, index) => (
                         <li key={`${event.meetingId}-${index}`}>
                           <HistoryLine
@@ -322,14 +360,17 @@ export function EvidencePanel({
       </section>
 
       <section>
-        <h2 className="text-lg font-medium">Decisions</h2>
+        <div className="flex items-center gap-2">
+          <Gavel className="size-4 text-primary" aria-hidden="true" />
+          <h2 className="font-semibold">Decisions</h2>
+        </div>
         {decisions.length === 0 ? (
           <p className="mt-2 text-sm text-muted-foreground">No decisions were found.</p>
         ) : (
           <ul className="mt-3 space-y-4">
             {decisions.map((item) => (
-              <li key={item.id} className="rounded-lg border p-3">
-                <p className="text-sm break-words">{item.text}</p>
+              <li key={item.id} className="rounded-xl border border-border/80 bg-card p-4 shadow-xs">
+                <p className="text-sm font-medium leading-6 break-words">{item.text}</p>
                 <QuoteChip
                   quote={item.quote}
                   startMs={item.start_ms}
@@ -350,13 +391,16 @@ export function EvidencePanel({
 
       {chapters.length > 0 ? (
         <section>
-          <h2 className="text-lg font-medium">Chapters</h2>
-          <ul className="mt-2 space-y-1">
+          <div className="flex items-center gap-2">
+            <BookMarked className="size-4 text-primary" aria-hidden="true" />
+            <h2 className="font-semibold">Chapters</h2>
+          </div>
+          <ul className="mt-3 space-y-1">
             {chapters.map((chapter) => (
               <li key={`${chapter.segment_idx}-${chapter.start_ms}`}>
                 <button
                   type="button"
-                  className="w-full rounded-md px-2 py-1 text-left text-sm hover:bg-muted"
+                  className="w-full rounded-xl px-3 py-2.5 text-left text-sm hover:bg-muted"
                   onClick={() => onSeek(chapter.start_ms, chapter.segment_idx)}
                 >
                   <span className="text-muted-foreground">{formatTimestamp(chapter.start_ms)}</span>
@@ -370,9 +414,9 @@ export function EvidencePanel({
       ) : null}
 
       {droppedCount > 0 ? (
-        <p className="text-sm text-muted-foreground">
-          {droppedCount} {droppedCount === 1 ? "item" : "items"} dropped: no evidence
-        </p>
+        <div className="rounded-xl border border-dashed border-border bg-muted/40 p-3 text-sm text-muted-foreground">
+          {droppedCount} {droppedCount === 1 ? "item was" : "items were"} dropped because no supporting evidence was found.
+        </div>
       ) : null}
     </div>
   );
@@ -423,10 +467,11 @@ function QuoteChip({
   return (
     <button
       type="button"
-      className="mt-2 block max-w-full rounded-md border px-2 py-1 text-left text-xs text-muted-foreground hover:bg-muted break-words"
+      className="mt-3 flex max-w-full items-start gap-2 rounded-xl border border-border/70 bg-muted/35 px-3 py-2 text-left text-xs leading-5 text-muted-foreground hover:border-primary/25 hover:bg-primary/5 hover:text-foreground break-words"
       onClick={onSeek}
     >
-      {formatTimestamp(startMs)} · “{quote}”
+      <Quote className="mt-0.5 size-3.5 shrink-0 text-primary" aria-hidden="true" />
+      <span><span className="font-mono font-medium text-primary">{formatTimestamp(startMs)}</span> · “{quote}”</span>
     </button>
   );
 }
@@ -508,7 +553,21 @@ function ReviewButtons({
           Reject
         </Button>
       </div>
+      {current === "confirmed" ? (
+        <p className="mt-2 flex items-center gap-1.5 text-xs font-medium text-emerald-700">
+          <CheckCircle2 className="size-3.5" aria-hidden="true" />
+          Confirmed by you
+        </p>
+      ) : null}
       {error ? <p className="mt-2 text-xs text-destructive">{error}</p> : null}
     </div>
   );
+}
+
+function statusTone(status: string) {
+  if (status === "done") return "bg-emerald-50 text-emerald-700";
+  if (status === "dropped") return "bg-amber-50 text-amber-700";
+  if (status === "changed") return "bg-violet-50 text-violet-700";
+  if (status === "in_progress") return "bg-sky-50 text-sky-700";
+  return "bg-muted text-muted-foreground";
 }

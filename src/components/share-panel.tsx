@@ -2,6 +2,7 @@
 
 import { useState } from "react";
 import { useRouter } from "next/navigation";
+import { Copy, Link2, ShieldCheck, UserRound, UsersRound, X } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import type { ShareLink } from "@/lib/share-view";
 
@@ -95,13 +96,17 @@ export function SharePanel({
   }
 
   return (
-    <section>
-      <h2 className="text-lg font-medium">Share</h2>
+    <section className="surface p-5 sm:p-6">
+      <div className="flex items-center gap-2">
+        <Link2 className="size-4 text-primary" aria-hidden="true" />
+        <h2 className="font-semibold">Share safely</h2>
+      </div>
       <p className="mt-1 text-sm text-muted-foreground">
-        A share link is read-only. Emails, phone numbers, and card numbers are hidden. The audio stays private.
+        Read-only links hide emails, phone numbers, and card numbers. Audio always stays private.
       </p>
       <div className="mt-3 flex flex-wrap gap-2">
         <Button type="button" disabled={busy !== null} onClick={() => void create(null)}>
+          <UsersRound className="size-4" aria-hidden="true" />
           {busy === "meeting" ? "Sharing…" : "Share meeting"}
         </Button>
         {people.map((person) => (
@@ -112,6 +117,7 @@ export function SharePanel({
             disabled={busy !== null}
             onClick={() => void create(person.id)}
           >
+            <UserRound className="size-4" aria-hidden="true" />
             {busy === person.id ? "Sharing…" : `Share ${person.name}`}
           </Button>
         ))}
@@ -119,12 +125,13 @@ export function SharePanel({
       {links.length > 0 ? (
         <ul className="mt-4 space-y-2">
           {links.map((link) => (
-            <li key={link.token} className="flex flex-wrap items-center gap-2 text-sm">
+            <li key={link.token} className="flex flex-wrap items-center gap-2 rounded-xl border border-border/70 bg-muted/35 p-3 text-sm">
               <span className="min-w-0 flex-1">
                 {link.personName ? `Only ${link.personName}` : "Whole meeting"}
                 <span className="mt-0.5 block truncate text-xs text-muted-foreground">/share/{link.token}</span>
               </span>
               <Button type="button" size="sm" variant="outline" disabled={busy !== null} onClick={() => void copy(link.token)}>
+                <Copy className="size-3.5" aria-hidden="true" />
                 Copy link
               </Button>
               <Button
@@ -134,13 +141,14 @@ export function SharePanel({
                 disabled={busy !== null}
                 onClick={() => void revoke(link.token)}
               >
+                <X className="size-3.5" aria-hidden="true" />
                 {busy === `revoke:${link.token}` ? "Revoking…" : "Revoke"}
               </Button>
             </li>
           ))}
         </ul>
       ) : null}
-      {notice ? <p className="mt-2 text-sm text-muted-foreground">{notice}</p> : null}
+      {notice ? <p className="mt-3 flex items-center gap-2 text-sm text-emerald-700"><ShieldCheck className="size-4" aria-hidden="true" />{notice}</p> : null}
       {error ? <p className="mt-2 text-sm text-destructive">{error}</p> : null}
     </section>
   );

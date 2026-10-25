@@ -1,4 +1,5 @@
 import Link from "next/link";
+import { CheckCircle2, ShieldCheck } from "lucide-react";
 import { kindLabel, statusLabel } from "@/lib/meeting-view";
 import { formatMeetingWhen } from "@/lib/library";
 import { formatTimestamp } from "@/lib/playback";
@@ -7,15 +8,21 @@ import type { ShareDocument } from "@/lib/share-view";
 export function ShareDocumentView({ document }: { document: ShareDocument }) {
   const when = formatMeetingWhen(document.recordedAt);
   return (
-    <article>
-      <h1 className="text-2xl font-semibold tracking-tight">{document.title}</h1>
-      <p className="mt-2 text-sm text-muted-foreground">
-        {document.personName ? `Notes for ${document.personName}` : "Whole meeting"}
-        {" · "}
-        {when}
-        {" · "}
-        Read-only
-      </p>
+    <article className="surface overflow-hidden">
+      <header className="border-b border-border/70 bg-gradient-to-r from-primary/8 to-cyan-500/5 p-5 sm:p-8">
+        <div className="flex flex-wrap items-center gap-2 text-xs font-medium text-primary">
+          <span className="inline-flex items-center gap-1.5 rounded-full border border-primary/15 bg-card/70 px-2.5 py-1">
+            <ShieldCheck className="size-3.5" aria-hidden="true" />
+            Redacted & read-only
+          </span>
+          <span>{when}</span>
+        </div>
+        <h1 className="mt-4 text-3xl font-semibold tracking-[-0.035em] break-words">{document.title}</h1>
+        <p className="mt-2 text-sm text-muted-foreground">
+          {document.personName ? `Notes prepared for ${document.personName}` : "Shared meeting notes"}
+        </p>
+      </header>
+      <div className="p-5 sm:p-8">
       {document.tldr.length > 0 ? (
         <section className="mt-8">
           <h2 className="text-lg font-medium">TL;DR</h2>
@@ -99,6 +106,7 @@ export function ShareDocumentView({ document }: { document: ShareDocument }) {
           </ol>
         )}
       </section>
+      </div>
     </article>
   );
 }
@@ -106,14 +114,17 @@ export function ShareDocumentView({ document }: { document: ShareDocument }) {
 export function ShareFrame({ children }: { children: React.ReactNode }) {
   return (
     <div className="flex min-h-svh flex-1 flex-col">
-      <header className="border-b">
-        <div className="mx-auto flex w-full max-w-3xl px-6 py-3">
-          <Link href="/" className="text-sm font-semibold tracking-tight">
+      <header className="border-b border-border/70 bg-background/85 backdrop-blur-xl">
+        <div className="mx-auto flex min-h-16 w-full max-w-4xl items-center px-4 sm:px-6">
+          <Link href="/" className="flex items-center gap-2.5 text-sm font-semibold tracking-tight">
+            <span className="grid size-8 place-items-center rounded-lg bg-primary text-primary-foreground">
+              <CheckCircle2 className="size-4" aria-hidden="true" />
+            </span>
             Kept
           </Link>
         </div>
       </header>
-      <main className="mx-auto w-full max-w-3xl flex-1 px-6 py-10">{children}</main>
+      <main className="mx-auto w-full max-w-4xl flex-1 px-4 py-6 sm:px-6 sm:py-10">{children}</main>
     </div>
   );
 }

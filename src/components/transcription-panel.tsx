@@ -2,6 +2,7 @@
 
 import { useEffect, useState } from "react";
 import { useRouter } from "next/navigation";
+import { Check, CircleAlert, LoaderCircle } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import {
   processingStepMark,
@@ -142,25 +143,35 @@ export function TranscriptionPanel({
   const transcriptionRetry = !readOnly && showTranscriptionRetry({ status, hasAudio, busy, stalled, error });
 
   return (
-    <div>
-      <h2 className="text-lg font-medium">Processing</h2>
+    <div className="surface p-5 sm:p-6">
+      <h2 className="font-semibold">Processing your meeting</h2>
       {status === "created" ? (
         <p className="mt-2 text-sm text-muted-foreground">The upload did not finish.</p>
       ) : (
-        <ol className="mt-3 space-y-1 text-sm">
+        <ol className="mt-5 grid gap-2 sm:grid-cols-4">
           {STEPS.map((step) => {
             const mark = processingStepMark(step.id, status, hasAudio, error);
             return (
               <li
                 key={step.id}
                 aria-current={mark === "current" ? "step" : undefined}
-                className={mark === "upcoming" ? "text-muted-foreground" : undefined}
+                className={`rounded-xl border px-3 py-3 text-sm ${
+                  mark === "done"
+                    ? "border-emerald-200 bg-emerald-50 text-emerald-800"
+                    : mark === "current"
+                      ? "border-primary/25 bg-primary/5 text-primary"
+                      : mark === "failed"
+                        ? "border-destructive/20 bg-destructive/5 text-destructive"
+                        : "bg-muted/35 text-muted-foreground"
+                }`}
               >
-                <span className={mark === "failed" ? "text-destructive" : undefined}>
+                <span className="flex items-center gap-1.5 text-xs font-medium">
+                  {mark === "done" ? <Check className="size-3.5" aria-hidden="true" /> : null}
+                  {mark === "current" ? <LoaderCircle className="size-3.5 animate-spin" aria-hidden="true" /> : null}
+                  {mark === "failed" ? <CircleAlert className="size-3.5" aria-hidden="true" /> : null}
                   {MARK_LABEL[mark]}
                 </span>
-                {" · "}
-                {step.label}
+                <span className="mt-1 block font-medium">{step.label}</span>
               </li>
             );
           })}

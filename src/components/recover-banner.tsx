@@ -2,6 +2,7 @@
 
 import { useEffect, useState } from "react";
 import { useRouter } from "next/navigation";
+import { RotateCcw } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { shouldDiscardLocal } from "@/lib/capture-limits";
 import { durationForRecording } from "@/lib/media-duration";
@@ -99,14 +100,21 @@ export function RecoverBanner() {
   }
 
   return (
-    <div className="rounded-lg border bg-muted/40 px-4 py-3">
+    <div className="rounded-2xl border border-primary/20 bg-primary/5 px-4 py-4 shadow-xs">
       {session ? (
         <>
-          <p className="text-sm font-medium">Recover recording</p>
-          <p className="mt-1 text-sm text-muted-foreground">
+          <div className="flex items-start gap-3">
+            <span className="grid size-9 shrink-0 place-items-center rounded-xl bg-primary/10 text-primary">
+              <RotateCcw className="size-4" aria-hidden="true" />
+            </span>
+            <div>
+          <p className="text-sm font-semibold">Recover recording</p>
+          <p className="mt-1 text-sm leading-6 text-muted-foreground">
             {session.title} is still saved on this device. If it is open in another tab, stop it
             there first.
           </p>
+            </div>
+          </div>
           <div className="mt-3 flex flex-wrap gap-2">
             <Button type="button" disabled={pending != null} onClick={() => void recover(session)}>
               {pending === "upload" ? "Uploading…" : "Recover and upload"}

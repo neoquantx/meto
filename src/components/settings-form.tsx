@@ -1,12 +1,13 @@
 "use client";
 
 import { useState } from "react";
+import { BookType, Copy, Download, Languages, Trash2, UserRound } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import type { SummaryLanguage } from "@/lib/capture-limits";
 import { DELETE_CONFIRM } from "@/lib/settings-form";
 
 const fieldClass =
-  "mt-1 w-full rounded-lg border bg-background px-3 py-2 text-sm outline-none focus-visible:border-ring focus-visible:ring-3 focus-visible:ring-ring/50";
+  "field mt-1.5";
 
 async function errorMessage(response: Response, fallback: string) {
   try {
@@ -129,26 +130,33 @@ export function SettingsForm({
   }
 
   return (
-    <div className="mt-8 max-w-xl space-y-10">
+    <div className="mt-8 grid gap-5 lg:grid-cols-2">
       {userId ? (
-        <section className="space-y-2">
-          <h2 className="text-lg font-medium">Account ID</h2>
+        <section className="surface space-y-3 p-5 sm:p-6 lg:col-span-2">
+          <div className="flex items-center gap-2">
+            <UserRound className="size-4 text-primary" aria-hidden="true" />
+            <h2 className="font-semibold">Account ID</h2>
+          </div>
           <p className="text-sm text-muted-foreground">
             Use this ID as <code className="rounded bg-muted px-1 py-0.5 text-xs">DEMO_OWNER_ID</code> to publish this account&apos;s meetings to the read-only <code className="rounded bg-muted px-1 py-0.5 text-xs">/demo</code> view.
           </p>
-          <div className="flex flex-wrap items-center gap-2">
-            <code className="rounded-lg border bg-muted/40 px-3 py-1.5 font-mono text-xs break-all">
+          <div className="flex flex-col gap-2 sm:flex-row sm:items-center">
+            <code className="min-w-0 flex-1 rounded-xl border bg-muted/40 px-3 py-2.5 font-mono text-xs break-all">
               {userId}
             </code>
             <Button type="button" size="sm" variant="outline" onClick={() => void copyUserId()}>
+              <Copy className="size-3.5" aria-hidden="true" />
               Copy ID
             </Button>
           </div>
         </section>
       ) : null}
-      <section className="space-y-4">
+      <section className="surface space-y-5 p-5 sm:p-6 lg:col-span-2">
         <div>
-          <h2 className="text-lg font-medium">Glossary</h2>
+          <div className="flex items-center gap-2">
+            <BookType className="size-4 text-primary" aria-hidden="true" />
+            <h2 className="font-semibold">Glossary & language</h2>
+          </div>
           <p className="mt-1 text-sm text-muted-foreground">
             One name or phrase per line. The first 100 are sent to transcription, 100 characters each.
           </p>
@@ -158,7 +166,10 @@ export function SettingsForm({
           <textarea className={fieldClass} rows={8} value={terms} onChange={(event) => setTerms(event.target.value)} />
         </label>
         <label className="block text-sm font-medium">
-          Default summary language
+          <span className="flex items-center gap-2">
+            <Languages className="size-4 text-muted-foreground" aria-hidden="true" />
+            Default summary language
+          </span>
           <select
             className={fieldClass}
             value={language}
@@ -176,17 +187,24 @@ export function SettingsForm({
           {busy === "save" ? "Saving…" : "Save settings"}
         </Button>
       </section>
-      <section className="space-y-3">
-        <h2 className="text-lg font-medium">Export</h2>
+      <section className="surface space-y-3 p-5 sm:p-6">
+        <span className="grid size-10 place-items-center rounded-xl bg-primary/10 text-primary">
+          <Download className="size-4.5" aria-hidden="true" />
+        </span>
+        <h2 className="font-semibold">Export your data</h2>
         <p className="text-sm text-muted-foreground">
           A zip with Markdown and JSON for every meeting. Emails, phone numbers, and card numbers are hidden.
         </p>
         <Button type="button" variant="outline" disabled={busy !== null} onClick={() => void download()}>
+          <Download className="size-4" aria-hidden="true" />
           {busy === "export" ? "Exporting…" : "Export all"}
         </Button>
       </section>
-      <section className="space-y-3">
-        <h2 className="text-lg font-medium">Delete all</h2>
+      <section className="rounded-2xl border border-destructive/20 bg-destructive/3 p-5 shadow-xs sm:p-6">
+        <span className="grid size-10 place-items-center rounded-xl bg-destructive/10 text-destructive">
+          <Trash2 className="size-4.5" aria-hidden="true" />
+        </span>
+        <h2 className="mt-3 font-semibold">Delete all data</h2>
         <p className="text-sm text-muted-foreground">
           Removes meetings, audio, people, and settings. This cannot be undone. Your sign-in stays.
         </p>
@@ -208,8 +226,8 @@ export function SettingsForm({
           {busy === "delete" ? "Deleting…" : "Delete everything"}
         </Button>
       </section>
-      {notice ? <p className="text-sm text-muted-foreground">{notice}</p> : null}
-      {error ? <p className="text-sm text-destructive">{error}</p> : null}
+      {notice ? <p className="rounded-xl border border-emerald-200 bg-emerald-50 p-3 text-sm text-emerald-800 lg:col-span-2">{notice}</p> : null}
+      {error ? <p className="rounded-xl border border-destructive/20 bg-destructive/5 p-3 text-sm text-destructive lg:col-span-2">{error}</p> : null}
     </div>
   );
 }

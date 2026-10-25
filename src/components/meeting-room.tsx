@@ -1,6 +1,7 @@
 "use client";
 
 import { useEffect, useMemo, useRef, useState } from "react";
+import { Headphones, Radio, ScrollText } from "lucide-react";
 import { EvidencePanel, SpeakerPanel } from "@/components/meeting-panels";
 import type { OffRecordRange } from "@/lib/capture-limits";
 import {
@@ -141,53 +142,76 @@ export function MeetingRoom({
   }
 
   return (
-    <div className={showSide ? "grid items-start gap-8 lg:grid-cols-2" : undefined}>
+    <div className={showSide ? "grid items-start gap-6 xl:grid-cols-[minmax(0,1.05fr)_minmax(22rem,0.95fr)] xl:gap-8" : undefined}>
       <div className="min-w-0">
         {playbackUrl ? (
-          video ? (
-            <video
-              ref={videoRef}
-              controls
-              playsInline
-              preload="metadata"
-              src={playbackUrl}
-              className="w-full rounded-lg"
-              onTimeUpdate={syncFromMedia}
-              onSeeked={syncFromMedia}
-              onLoadedMetadata={onLoadedMetadata}
-            />
-          ) : (
-            <audio
-              ref={audioRef}
-              controls
-              preload="metadata"
-              src={playbackUrl}
-              className="w-full"
-              onTimeUpdate={syncFromMedia}
-              onSeeked={syncFromMedia}
-              onLoadedMetadata={onLoadedMetadata}
-            />
-          )
+          <div className="surface overflow-hidden p-3 sm:p-4">
+            {video ? (
+              <video
+                ref={videoRef}
+                controls
+                playsInline
+                preload="metadata"
+                src={playbackUrl}
+                className="aspect-video w-full rounded-xl bg-slate-950"
+                onTimeUpdate={syncFromMedia}
+                onSeeked={syncFromMedia}
+                onLoadedMetadata={onLoadedMetadata}
+              />
+            ) : (
+              <div className="rounded-xl bg-gradient-to-br from-slate-900 to-indigo-950 p-4 sm:p-5">
+                <div className="mb-4 flex items-center gap-3 text-white">
+                  <span className="grid size-10 place-items-center rounded-xl bg-white/10">
+                    <Headphones className="size-5" aria-hidden="true" />
+                  </span>
+                  <div>
+                    <p className="text-sm font-semibold">Meeting audio</p>
+                    <p className="text-xs text-white/55">Click transcript lines to seek</p>
+                  </div>
+                </div>
+                <audio
+                  ref={audioRef}
+                  controls
+                  preload="metadata"
+                  src={playbackUrl}
+                  className="h-10 w-full"
+                  onTimeUpdate={syncFromMedia}
+                  onSeeked={syncFromMedia}
+                  onLoadedMetadata={onLoadedMetadata}
+                />
+              </div>
+            )}
+          </div>
         ) : (
-          <p className="text-sm text-muted-foreground">Playback is unavailable.</p>
+          <div className="surface-muted flex items-center gap-3 p-4 text-sm text-muted-foreground">
+            <Radio className="size-5 shrink-0" aria-hidden="true" />
+            <div>
+              <p className="font-medium text-foreground">Transcript preview</p>
+              <p>Audio is unavailable in the built-in demo. Every timestamp remains interactive.</p>
+            </div>
+          </div>
         )}
 
         {segments.length > 0 ? (
-          <div className="mt-6">
+          <section className="surface mt-5 overflow-hidden">
             <div className="flex items-center justify-between gap-3">
-              <h2 className="text-lg font-medium">Transcript</h2>
-              <label className="flex items-center gap-2 text-sm">
+              <div className="flex items-center gap-2 px-4 pt-4 sm:px-5 sm:pt-5">
+                <ScrollText className="size-4 text-primary" aria-hidden="true" />
+                <h2 className="font-semibold">Transcript</h2>
+              </div>
+              <label className="mr-4 mt-4 flex items-center gap-2 text-xs font-medium text-muted-foreground sm:mr-5 sm:mt-5">
                 <input
                   type="checkbox"
                   checked={follow}
                   onChange={(event) => setFollow(event.target.checked)}
+                  className="size-4 accent-primary"
                 />
                 Follow playback
               </label>
             </div>
             <ol
               ref={listRef}
-              className="relative mt-3 max-h-[28rem] space-y-1 overflow-y-auto rounded-lg border p-2"
+              className="relative mt-3 max-h-[32rem] space-y-1 overflow-y-auto border-t border-border/70 p-2 sm:p-3"
             >
               {markers.map((marker) => {
                 if (marker.kind === "segment") {
@@ -206,13 +230,18 @@ export function MeetingRoom({
                       <button
                         type="button"
                         aria-current={current ? "true" : undefined}
-                        className={`w-full rounded-md px-2 py-2 text-left ${current ? "bg-accent text-accent-foreground" : "hover:bg-muted"}`}
+                        className={`w-full rounded-xl px-3 py-3 text-left transition-colors ${current ? "bg-primary/9 text-accent-foreground ring-1 ring-primary/15" : "hover:bg-muted/80"}`}
                         onClick={() => seek(segment.start_ms, segment.idx)}
                       >
-                        <span className="text-xs text-muted-foreground">
-                          {formatTimestamp(segment.start_ms)} · {ownerLabel(nameBySpeaker.get(segment.speaker), segment.speaker)}
+                        <span className="flex items-center gap-2 text-xs">
+                          <span className="rounded-md bg-primary/8 px-1.5 py-0.5 font-mono font-medium text-primary">
+                            {formatTimestamp(segment.start_ms)}
+                          </span>
+                          <span className="font-semibold text-foreground/75">
+                            {ownerLabel(nameBySpeaker.get(segment.speaker), segment.speaker)}
+                          </span>
                         </span>
-                        <span className="mt-1 block text-sm break-words">{segment.text}</span>
+                        <span className="mt-2 block text-sm leading-6 break-words">{segment.text}</span>
                       </button>
                     </li>
                   );
@@ -223,7 +252,7 @@ export function MeetingRoom({
                   <li key={`${marker.kind}-${at}`}>
                     <button
                       type="button"
-                      className="w-full rounded-md px-2 py-2 text-left text-xs text-muted-foreground hover:bg-muted"
+                      className="w-full rounded-xl border border-dashed border-border px-3 py-2.5 text-left text-xs text-muted-foreground hover:border-primary/30 hover:bg-muted"
                       onClick={() => seek(at)}
                     >
                       {formatTimestamp(at)} · {marker.label}
@@ -232,7 +261,7 @@ export function MeetingRoom({
                 );
               })}
             </ol>
-          </div>
+          </section>
         ) : null}
         {speechChecked && segments.length === 0 ? (
           <p className="mt-6 text-sm text-muted-foreground">No speech was detected.</p>
@@ -240,27 +269,31 @@ export function MeetingRoom({
       </div>
 
       {showSide ? (
-        <div className="min-w-0 space-y-8">
+        <div className="min-w-0 space-y-5">
           {speakers.length > 0 ? (
-            <SpeakerPanel
-              key={speakers.map((speaker) => speaker.speaker).join(",")}
-              meetingId={meetingId}
-              speakers={speakers}
-              ledgerChecked={ledgerChecked}
-              readOnly={readOnly}
-            />
+            <div className="surface p-4 sm:p-5">
+              <SpeakerPanel
+                key={speakers.map((speaker) => speaker.speaker).join(",")}
+                meetingId={meetingId}
+                speakers={speakers}
+                ledgerChecked={ledgerChecked}
+                readOnly={readOnly}
+              />
+            </div>
           ) : null}
           {ready ? (
-            <EvidencePanel
-              meetingId={meetingId}
-              tldr={tldr}
-              chapters={chapters}
-              decisions={decisions}
-              commitments={commitments}
-              droppedCount={droppedCount}
-              onSeek={seek}
-              readOnly={readOnly}
-            />
+            <div className="surface p-4 sm:p-5 lg:p-6">
+              <EvidencePanel
+                meetingId={meetingId}
+                tldr={tldr}
+                chapters={chapters}
+                decisions={decisions}
+                commitments={commitments}
+                droppedCount={droppedCount}
+                onSeek={seek}
+                readOnly={readOnly}
+              />
+            </div>
           ) : null}
         </div>
       ) : null}
