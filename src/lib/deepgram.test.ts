@@ -26,8 +26,8 @@ describe("deepgram listen", () => {
     const url = new URL(buildListenUrl(["Rahul", "pricing deck"]));
     expect(url.searchParams.get("model")).toBe("nova-3");
     expect(url.searchParams.get("language")).toBe("multi");
-    expect(url.searchParams.get("diarize")).toBeNull();
-    expect(url.searchParams.get("diarize_model")).toBe("latest");
+    expect(url.searchParams.get("diarize")).toBe("true");
+    expect(url.searchParams.get("diarize_model")).toBeNull();
     expect(url.searchParams.get("utterances")).toBe("true");
     expect(url.searchParams.get("smart_format")).toBe("true");
     expect(url.searchParams.get("mip_opt_out")).toBe("true");
@@ -61,6 +61,16 @@ describe("deepgram listen", () => {
       { idx: 2, speaker: 0, start_ms: 3000, end_ms: 4000, text: "later" },
     ]);
     expect(speakerIds(segmentsFromUtterances(parsed.utterances))).toEqual([0, 1]);
+  });
+
+  it("preserves separate speaker labels from diarized utterances", () => {
+    const segments = segmentsFromUtterances([
+      { start: 0, end: 1, speaker: 0, transcript: "I am Himanshu." },
+      { start: 1, end: 2, speaker: 1, transcript: "I am Rahul." },
+    ]);
+
+    expect(segments.map((segment) => segment.speaker)).toEqual([0, 1]);
+    expect(speakerIds(segments)).toEqual([0, 1]);
   });
 
   it("bills the saved duration, then the heard duration", () => {
