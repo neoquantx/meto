@@ -19,10 +19,23 @@ Cursor's native agent hooks ([docs](https://cursor.com/docs/agent/hooks)), confi
 - Fallback: if `beforeSubmitPrompt` didn't fire for a turn, `stop` recovers the prompt from Cursor's transcript file (`transcript_path`) and tags the entry `source: transcript`; with no transcript it writes an explicit `source: missing` placeholder rather than skipping the turn.
 - `.gitignore` excludes only the hook's scratch state (`.cursor/hooks/.state/`). `.agent-logs/` is committed.
 
+## VS Code Copilot setup
+
+- **Tool:** VS Code with the Copilot session target.
+- **Model:** The hook payload reports `unknown`; the exact routed model is not exposed to this runtime. One model plans and executes; there is no separate planner.
+- **Mechanism:** Copilot workspace hooks under `.github/hooks/`.
+  - `.github/hooks/capture.json` wires `userPromptSubmitted` to prompt capture and `agentStop` to response capture.
+  - `.github/hooks/capture.cjs` writes append-only entries to `.agent-logs/` and keeps per-session state under `.github/hooks/.state/`.
+  - `.github/hooks/capture.config.json` supplies the author, tool, and project metadata.
+- **Verification:** Prompt capture worked in two separate VS Code Copilot sessions. Both `agentStop` events fired, but neither payload exposed response text or a readable transcript. The logger records an explicit `source: missing` entry rather than fabricating a response.
+- **Result:** The hook is installed and cross-session prompt capture is verified, but the full prompt-and-final-response requirement cannot be claimed for this Copilot runtime. The existing Cursor hook remains the complete prompt-and-response capture path in this repository.
+
 ## Log files the canaries landed in
 
 - Session 1 (the chat that installed the hook): `.agent-logs/2026-10-24_17-51-05_a65787c3-e5f7-45ad-9aa3-584c08f9c7ac.md`
 - Session 2 (a fresh chat): `.agent-logs/2026-10-24_17-54-08_cf041373-935d-4633-84aa-15acf969d625.md`
+- VS Code Copilot session 1: `.agent-logs/2026-10-25_05-13-20_bf090a2b-42f0-491d-b409-905bd1114b47.md`
+- VS Code Copilot session 2: `.agent-logs/2026-10-25_05-16-14_edecffdd-270f-41d5-a2e2-b0a6d768bcf4.md`
 
 ## Canary entries (raw)
 
@@ -81,6 +94,57 @@ Two small things you might want to look at:
 
 The session 2 agent's reply in the chat UI also contained intermediate progress notes ("I'll take a quick look at the workspace…"); they are correctly absent from the log, which confirms only the final response is captured.
 
+### VS Code Copilot session 1 (raw)
+
+````
+[LOG_ENTRY type=PROMPT num=1 session=bf090a2b]
+timestamp: 2026-10-25T05:13:20.118Z
+model: unknown
+
+CAPTURE TEST — 8x assignment, Himanshu
+
+
+[LOG_ENTRY type=RESPONSE num=1 session=bf090a2b]
+timestamp: 2026-10-25T05:13:24.432Z
+model: unknown
+source: missing
+
+[response not captured: agentStop provided no response text or readable transcript]
+````
+
+### VS Code Copilot session 2 (raw)
+
+````
+[LOG_ENTRY type=PROMPT num=1 session=edecffdd]
+timestamp: 2026-10-25T05:16:14.283Z
+model: unknown
+
+CAPTURE TEST — 8x assignment, Himanshu
+
+
+[LOG_ENTRY type=RESPONSE num=1 session=edecffdd]
+timestamp: 2026-10-25T05:16:18.072Z
+model: unknown
+source: missing
+
+[response not captured: agentStop provided no response text or readable transcript]
+
+
+[LOG_ENTRY type=PROMPT num=2 session=edecffdd]
+timestamp: 2026-10-25T05:16:34.119Z
+model: unknown
+
+Please confirm the canary response was produced.
+
+
+[LOG_ENTRY type=RESPONSE num=2 session=edecffdd]
+timestamp: 2026-10-25T05:16:37.610Z
+model: unknown
+source: missing
+
+[response not captured: agentStop provided no response text or readable transcript]
+````
+
 ## What didn't work first, and known quirks
 
 - **Rules file instead of hooks:** considered and rejected. Cursor rules only add instructions to the model's context; they can't run a command, so capture would depend on the model remembering to log. Hooks fire on their own.
@@ -89,3 +153,5 @@ The session 2 agent's reply in the chat UI also contained intermediate progress 
 - **Setup prompt captured via fallback:** the hook didn't exist yet when the setup prompt was sent, so session 1's entry 1 was recovered from the transcript at the end of that turn (`source: transcript`). Its timestamp is the moment of recovery, which is why PROMPT 1 (`17:51:05.349Z`) is a fraction of a second later than RESPONSE 1 (`17:51:05.187Z`). Left as recorded.
 - **Model shows `default` on Auto:** Cursor's Auto mode doesn't expose the routed model to hooks. Once an explicit model is selected, the payload includes it. Session 1's canary is `grok-4.7`.
 - **Not captured by design:** answers given through clickable multiple-choice question cards don't pass through `beforeSubmitPrompt`, so the agent asks questions in plain text instead.
+- **VS Code Copilot response capture:** `.github/hooks/capture.json` was tested in two separate Copilot sessions. `userPromptSubmitted` captured both prompts, but `agentStop` supplied no final response text or readable transcript, so the logger wrote explicit missing-response entries. This limitation is documented rather than hidden.
+- **VS Code Copilot model capture:** the hook payload reported `model: unknown` in both sessions; the exact routed model was not available to the repository hook.

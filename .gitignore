@@ -41,5 +41,6 @@ next-env.d.ts
 
 # capture hook scratch. Holds the local session payload, including an email.
 .cursor/hooks/.state/
+.github/hooks/.state/
 
 # .agent-logs/ is intentionally not ignored. It ships with the submission.
