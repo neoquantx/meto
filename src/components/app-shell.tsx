@@ -7,9 +7,13 @@ import { TryItButton } from "@/components/try-it-button";
 export function AppShell({
   children,
   readOnly = false,
+  userName,
+  userRole,
 }: {
   children: React.ReactNode;
   readOnly?: boolean;
+  userName?: string;
+  userRole?: string;
 }) {
   return (
     <div className="flex min-h-svh flex-1 bg-transparent lg:grid lg:grid-cols-[15rem_minmax(0,1fr)]">
@@ -32,6 +36,11 @@ export function AppShell({
           <div className="mt-5 flex items-center gap-2 rounded-xl border border-primary/15 bg-primary/5 px-3 py-2 text-xs font-medium text-primary">
             <Sparkles className="size-3.5" aria-hidden="true" />
             Read-only demo
+          </div>
+        ) : userName ? (
+          <div className="mt-5 rounded-xl border border-border/70 bg-muted/35 px-3 py-2.5">
+            <p className="truncate text-sm font-semibold">{userName}</p>
+            {userRole ? <p className="mt-0.5 truncate text-xs text-muted-foreground">{userRole}</p> : null}
           </div>
         ) : null}
         <div className="mt-6">
@@ -63,7 +72,12 @@ export function AppShell({
                 <TryItButton size="sm" />
               </>
             ) : (
-              <SignOutButton />
+              <div className="flex items-center gap-2">
+                {userName ? (
+                  <span className="max-w-32 truncate text-xs text-muted-foreground">{userName}</span>
+                ) : null}
+                <SignOutButton />
+              </div>
             )}
           </div>
         </div>

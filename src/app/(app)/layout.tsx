@@ -25,5 +25,5 @@ export default async function AppLayout({
   const profileRole = typeof metadata.primary_role === "string" ? metadata.primary_role.trim() : "";
   if (!profileName || !profileRole) redirect("/profile");
 
-  return <AppShell>{children}</AppShell>;
+  return <AppShell userName={profileName} userRole={profileRole}>{children}</AppShell>;
 }

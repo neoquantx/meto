@@ -37,9 +37,11 @@ export function ProfileForm({
         name?: unknown;
         role?: unknown;
       } | null;
+      const savedName = !initialName && typeof draft?.name === "string" ? draft.name : initialName;
+      const savedRole = !initialRole && typeof draft?.role === "string" ? draft.role : initialRole;
       startTransition(() => {
-        if (!initialName && typeof draft?.name === "string") setName(draft.name);
-        if (!initialRole && typeof draft?.role === "string") setRole(draft.role);
+        setName(savedName);
+        setRole(savedRole);
       });
       hydrated.current = true;
     } catch {
