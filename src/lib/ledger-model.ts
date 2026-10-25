@@ -50,6 +50,8 @@ const ledgerResponseSchema: Schema = {
   },
 };
 
+const FALLBACK_FLASH_MODELS = ["gemini-3.6-flash", "gemini-3.5-flash"];
+
 export async function requestLedger(input: {
   apiKey: string;
   model: string;
@@ -58,28 +60,50 @@ export async function requestLedger(input: {
   candidates: LedgerPromptItem[];
 }) {
   const ai = new GoogleGenAI({ apiKey: input.apiKey });
+  const contents = buildLedgerContents(
+    buildTranscript(input.segments, input.summaryLanguage),
+    input.candidates,
+  );
+  const models = [input.model, ...FALLBACK_FLASH_MODELS.filter((m) => m !== input.model)];
   let text: string | undefined;
-  try {
-    const response = await ai.models.generateContent({
-      model: input.model,
-      contents: buildLedgerContents(
-        buildTranscript(input.segments, input.summaryLanguage),
-        input.candidates,
-      ),
-      config: {
-        systemInstruction: RULES,
-        temperature: 0,
-        maxOutputTokens: 8192,
-        responseMimeType: "application/json",
-        responseSchema: ledgerResponseSchema,
-        ...(input.model.toLowerCase().includes("flash") ? { thinkingConfig: { thinkingBudget: 0 } } : {}),
-      },
-    });
-    text = response.text;
-  } catch (error) {
-    throw asLedgerError(error);
+  let lastError: unknown;
+
+  for (let i = 0; i < models.length; i += 1) {
+    const model = models[i]!;
+    const isPrimary = i === 0;
+    try {
+      const response = await ai.models.generateContent({
+        model,
+        contents,
+        config: {
+          systemInstruction: RULES,
+          temperature: 0,
+          maxOutputTokens: 8192,
+          responseMimeType: "application/json",
+          responseSchema: ledgerResponseSchema,
+          ...(model.toLowerCase().includes("flash") ? { thinkingConfig: { thinkingBudget: 0 } } : {}),
+          httpOptions: { timeout: isPrimary && models.length > 1 ? 15_000 : 45_000 },
+        },
+      });
+      text = response.text;
+      break;
+    } catch (error) {
+      lastError = error;
+      const status = statusCode(error);
+      const msg = error instanceof Error ? error.message : "";
+      const retryable =
+        status === 404 ||
+        status === 503 ||
+        status === 504 ||
+        status === 0 ||
+        /UNAVAILABLE|high demand|no longer available|aborted|timeout|fetch failed/i.test(msg);
+      if (!retryable || i === models.length - 1) {
+        throw asLedgerError(error);
+      }
+      console.warn(`Gemini model ${model} unavailable (${status || "timeout"}), falling back to ${models[i + 1]}.`);
+    }
   }
-  if (!text) throw new LedgerError(LEDGER_UNUSABLE, 502, "model");
+  if (!text) throw lastError ? asLedgerError(lastError) : new LedgerError(LEDGER_UNUSABLE, 502, "model");
   try {
     return parseLedger(text);
   } catch (error) {

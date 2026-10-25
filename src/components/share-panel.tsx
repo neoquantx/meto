@@ -20,10 +20,12 @@ export function SharePanel({
   meetingId,
   people,
   shares,
+  activeMs,
 }: {
   meetingId: string;
   people: { id: string; name: string }[];
   shares: ShareLink[];
+  activeMs?: number | null;
 }) {
   const router = useRouter();
   const [links, setLinks] = useState(shares);
@@ -59,7 +61,7 @@ export function SharePanel({
         personName: payload.personName ?? null,
       };
       setLinks((current) => (current.some((item) => item.token === link.token) ? current : [...current, link]));
-      setNotice(await copyLink(payload.token));
+      setNotice(await copyLink(payload.token, activeMs));
       setBusy(null);
       router.refresh();
     } catch {
@@ -71,7 +73,7 @@ export function SharePanel({
   async function copy(token: string) {
     setNotice(null);
     setError(null);
-    setNotice(await copyLink(token));
+    setNotice(await copyLink(token, activeMs));
   }
 
   async function revoke(token: string) {
@@ -154,8 +156,12 @@ export function SharePanel({
   );
 }
 
-async function copyLink(token: string) {
-  const url = `${window.location.origin}/share/${token}`;
+async function copyLink(token: string, activeMs?: number | null) {
+  const currentQuery = new URLSearchParams(window.location.search).get("t");
+  const fromQuery = currentQuery && /^\d+$/.test(currentQuery) ? Number(currentQuery) : null;
+  const t = activeMs != null && activeMs > 0 ? Math.floor(activeMs) : fromQuery && fromQuery > 0 ? fromQuery : null;
+  const suffix = t != null ? `?t=${t}` : "";
+  const url = `${window.location.origin}/share/${token}${suffix}`;
   try {
     await navigator.clipboard.writeText(url);
     return "Link copied.";

@@ -7,7 +7,9 @@ import {
 } from "@/lib/extraction-messages";
 import type { EvidenceSegment, ExtractionDraft } from "@/lib/verify";
 
-export const DEFAULT_GEMINI_MODEL = "gemini-2.5-flash";
+export const DEFAULT_GEMINI_MODEL = "gemini-3.6-flash";
+
+const FALLBACK_FLASH_MODELS = ["gemini-3.6-flash", "gemini-3.5-flash"];
 
 const SUMMARY_LANGUAGE: Record<string, string> = {
   en: "English",
@@ -213,25 +215,47 @@ export async function requestExtraction(input: {
   segments: EvidenceSegment[];
 }) {
   const ai = new GoogleGenAI({ apiKey: input.apiKey });
+  const contents = buildTranscript(input.segments, input.summaryLanguage);
+  const candidates = [input.model, ...FALLBACK_FLASH_MODELS.filter((m) => m !== input.model)];
   let text: string | undefined;
-  try {
-    const response = await ai.models.generateContent({
-      model: input.model,
-      contents: buildTranscript(input.segments, input.summaryLanguage),
-      config: {
-        systemInstruction: RULES,
-        temperature: 0,
-        maxOutputTokens: 8192,
-        responseMimeType: "application/json",
-        responseSchema: extractionResponseSchema,
-        ...(input.model.toLowerCase().includes("flash") ? { thinkingConfig: { thinkingBudget: 0 } } : {}),
-      },
-    });
-    text = response.text;
-  } catch (error) {
-    throw asExtractError(error);
+  let lastError: unknown;
+
+  for (let i = 0; i < candidates.length; i += 1) {
+    const model = candidates[i]!;
+    const isPrimary = i === 0;
+    try {
+      const response = await ai.models.generateContent({
+        model,
+        contents,
+        config: {
+          systemInstruction: RULES,
+          temperature: 0,
+          maxOutputTokens: 8192,
+          responseMimeType: "application/json",
+          responseSchema: extractionResponseSchema,
+          ...(model.toLowerCase().includes("flash") ? { thinkingConfig: { thinkingBudget: 0 } } : {}),
+          httpOptions: { timeout: isPrimary && candidates.length > 1 ? 15_000 : 45_000 },
+        },
+      });
+      text = response.text;
+      break;
+    } catch (error) {
+      lastError = error;
+      const status = statusCode(error);
+      const msg = error instanceof Error ? error.message : "";
+      const retryable =
+        status === 404 ||
+        status === 503 ||
+        status === 504 ||
+        status === 0 ||
+        /UNAVAILABLE|high demand|no longer available|aborted|timeout|fetch failed/i.test(msg);
+      if (!retryable || i === candidates.length - 1) {
+        throw asExtractError(error);
+      }
+      console.warn(`Gemini model ${model} unavailable (${status || "timeout"}), falling back to ${candidates[i + 1]}.`);
+    }
   }
-  if (!text) throw new ExtractError(EXTRACT_UNUSABLE, 502, "model");
+  if (!text) throw lastError ? asExtractError(lastError) : new ExtractError(EXTRACT_UNUSABLE, 502, "model");
   try {
     return parseExtraction(text);
   } catch (error) {

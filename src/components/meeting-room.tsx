@@ -139,6 +139,13 @@ export function MeetingRoom({
     const idx = segmentIdx ?? activeSegmentAt(ordered, ms);
     setActive(idx);
     scrollTo(idx);
+    if (typeof window !== "undefined" && Number.isFinite(ms)) {
+      const url = new URL(window.location.href);
+      url.searchParams.set("t", String(Math.max(0, Math.floor(ms))));
+      if (idx != null) url.searchParams.set("line", String(idx));
+      else url.searchParams.delete("line");
+      window.history.replaceState(null, "", `${url.pathname}${url.search}${url.hash}`);
+    }
   }
 
   return (

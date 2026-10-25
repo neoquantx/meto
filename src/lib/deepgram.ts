@@ -84,9 +84,6 @@ export function buildListenUrl(keyterms: string[]) {
   const url = new URL(LISTEN_URL);
   url.searchParams.set("model", "nova-3");
   url.searchParams.set("language", "multi");
-  // Speaker numbers are only returned when diarization is on.
-  // diarize_model selects the model the plan asks for.
-  url.searchParams.set("diarize", "true");
   url.searchParams.set("diarize_model", "latest");
   url.searchParams.set("utterances", "true");
   url.searchParams.set("smart_format", "true");

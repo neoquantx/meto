@@ -13,12 +13,21 @@ function textOf(value: unknown) {
   return typeof value === "string" ? value : "";
 }
 
+function firstQuery(value: string | string[] | undefined) {
+  return Array.isArray(value) ? value[0] : value;
+}
+
 export default async function SharePage({
   params,
+  searchParams,
 }: {
   params: Promise<{ token: string }>;
+  searchParams?: Promise<{ t?: string | string[] }>;
 }) {
   const { token } = await params;
+  const query = searchParams ? await searchParams : undefined;
+  const rawT = firstQuery(query?.t);
+  const startAtMs = rawT && /^\d+$/.test(rawT) ? Number(rawT) : null;
   if (!isShareToken(token)) notFound();
 
   let admin: ReturnType<typeof createAdminClient>;
@@ -120,7 +129,7 @@ export default async function SharePage({
 
   return (
     <ShareFrame>
-      <ShareDocumentView document={buildShareDocument(source)} />
+      <ShareDocumentView document={buildShareDocument(source)} startAtMs={startAtMs} />
     </ShareFrame>
   );
 }

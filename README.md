@@ -87,12 +87,25 @@ Complaints about AI notetakers cluster *after* the call: trust, follow-through a
 
 ---
 
-## What We Cut and Why
+## What We Cut and Why (Product Judgement & Tradeoffs)
 
-- **The meeting bot:** Top user complaint by volume (415 G2 mentions) and requires paid bot infrastructure (e.g., Recall.ai).
-- **CRM sync, sales scorecards, coaching metrics:** Enterprise sales add-ons that clutter individual and small-team follow-through.
-- **Talk-time and sentiment percentages:** Users report they are *"interesting for about a day"* ([r/AiNoteTaker](https://www.reddit.com/r/AiNoteTaker/comments/1wtaztu/at_what_point_did_we_start_needing_an_ai_tool_for/)).
-- **Live scrolling transcript during the call:** Competes with listening during the conversation; post-call synced transcript + verification is higher signal.
+- **Calendar connector (Google Calendar / Outlook):** Connecting Google Calendar or Outlook requires OAuth scopes, a redirect flow, and matching calendar events to recordings. We chose to spend that build budget on the **Commitment Ledger**, which is the core feature separating Kept from Fathom. On `/meetings/new`, the **Meeting date and time** field acts as the stand-in: you set when the meeting happened, and the Ledger evaluates promises in that chronological order. If extended, a post-call calendar webhook would fire when a meeting ends and pre-fill the title and attendee list.
+- **Structural summary templates (`sales call`, `1:1`, etc.):** The user research showed that the biggest complaint wasn't the structural shape of the summary — it was the excessive length and lack of follow-through across calls. We solved length with a hard **3-bullet TL;DR cap** (≤ 25 words each) and follow-through with the **Commitment Ledger**, while exposing a **Summary language** selector (`English`, `Hindi`, `Hinglish`) that controls how the summary is written. If structural templates were needed next, we would expose a single custom prompt prefix field in `/settings` that applies to every extraction.
+- **Live scrolling transcript & mid-call highlights:** Cut intentionally because research shows live transcripts compete with active listening — participants end up reading the screen instead of staying in the conversation. Instead, we built **post-call quote chips** on every commitment and decision: each chip is a clickable timestamp that jumps the player to the exact second the promise or decision was spoken. That is the moment that matters when reviewing with someone who wasn't in the room. A live mid-call bookmark button would be a one-day addition if product direction changed.
+- **The meeting bot:** Top user complaint in Fathom's G2 reviews (415 mentions). Instead, on Chrome desktop, **Meeting tab + mic** uses `getDisplayMedia` to capture the Zoom or Meet tab's audio and mixes in your microphone through the Web Audio API — no bot joins the call, nobody gets a notification, and nothing appears in the participant list.
+- **Isolated 30-second audio clip files on share links:** Share links (`Share meeting` / `Share [Name]`) are read-only, PII-redacted links that support deep-linked timestamps (`/share/[token]?t=...`) so the recipient lands directly on the relevant moment in the transcript and can jump between quote timestamps. Slicing isolated 30-second audio files would require server-side audio transcoding (`ffmpeg`), whereas deep-linked timestamp shares deliver 80% of the value — sending someone the exact moment a decision was made — while keeping raw audio private.
+- **CRM sync, sales scorecards, talk-time & sentiment metrics:** Enterprise sales add-ons that clutter individual and small-team follow-through; users report talk-time percentages are *"interesting for about a day"* ([r/AiNoteTaker](https://www.reddit.com/r/AiNoteTaker/comments/1wtaztu/at_what_point_did_we_start_needing_an_ai_tool_for/)).
+
+---
+
+## Multi-Speaker & Hour-Long Calls (8-Person Call Architecture)
+
+While the demo walkthrough uses a 2-person call and a 3-meeting ledger sequence, the architecture is built to handle 8-person, hour-long meetings:
+- **Diarization & duration caps:** Deepgram `nova-3` with `diarize=true` separates up to 8+ speakers, uploads allow up to **90 minutes** (and 50 MB), and the `simple` GIN `tsvector` index on `segments` keeps full-text transcript search fast as segment counts grow.
+- **Cross-call Ledger scaling:** The Commitment Ledger (`src/lib/ledger-check.ts`) queries and checks open promises across all named speakers in the meeting regardless of participant count.
+- **Where it gets bumpy at 8 speakers (and how we guard against it):** With 8 speakers over an hour, the extraction prompt grows longer and interleaved crosstalk makes LLM JSON output more prone to misattributing owners or hallucinating quotes. Kept's verification layer (`src/lib/verify.ts`) specifically guards against this:
+  1. Every commitment and decision quote is verified against a 3-segment window (`segment_idx - 1 .. segment_idx + 1`); unverified items are dropped and tallied in `dropped_count` (*"N items were dropped because no supporting evidence was found"*), never silently included.
+  2. Ownership is resolved in deterministic code rather than trusting the LLM's speaker guess (`self` requires the speaker of `segment_idx`; `assigned` requires a different speaker's explicit acknowledgement within the next 3 segments).
 
 ---
 
