@@ -26,9 +26,13 @@ export function ShareDocumentView({ document }: { document: ShareDocument }) {
           </ul>
         </section>
       ) : null}
-      {document.commitments.length > 0 ? (
-        <section className="mt-8">
-          <h2 className="text-lg font-medium">Commitments</h2>
+      <section className="mt-8">
+        <h2 className="text-lg font-medium">Commitments</h2>
+        {document.commitments.length === 0 ? (
+          <p className="mt-2 text-sm text-muted-foreground">
+            {document.personName ? "Nothing for you in this meeting." : "No commitments in this meeting."}
+          </p>
+        ) : (
           <ul className="mt-3 space-y-3">
             {document.commitments.map((item, index) => (
               <li key={`${item.startMs}-${index}`} className="rounded-lg border p-3">
@@ -37,18 +41,18 @@ export function ShareDocumentView({ document }: { document: ShareDocument }) {
                   <span className="text-muted-foreground">{item.owner}</span>
                   <span className="text-muted-foreground">{statusLabel(item.status) ?? "Open"}</span>
                 </p>
-                <p className="mt-2 text-sm">{item.text}</p>
-                {item.condition ? <p className="mt-1 text-sm text-muted-foreground">If {item.condition}</p> : null}
+                <p className="mt-2 text-sm break-words">{item.text}</p>
+                {item.condition ? <p className="mt-1 text-sm text-muted-foreground break-words">If {item.condition}</p> : null}
                 {item.dueDate ? <p className="mt-1 text-sm text-muted-foreground">Due {item.dueDate}</p> : null}
-                {item.changeNote ? <p className="mt-1 text-sm text-muted-foreground">{item.changeNote}</p> : null}
-                <p className="mt-2 text-xs text-muted-foreground">
+                {item.changeNote ? <p className="mt-1 text-sm text-muted-foreground break-words">{item.changeNote}</p> : null}
+                <p className="mt-2 text-xs text-muted-foreground break-words">
                   {formatTimestamp(item.startMs)} · “{item.quote}”
                 </p>
               </li>
             ))}
           </ul>
-        </section>
-      ) : null}
+        )}
+      </section>
       {document.decisions.length > 0 ? (
         <section className="mt-8">
           <h2 className="text-lg font-medium">Decisions</h2>

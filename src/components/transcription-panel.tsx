@@ -70,22 +70,30 @@ export function TranscriptionPanel({
   status: initialStatus,
   error: initialError,
   hasAudio,
+  readOnly = false,
 }: {
   meetingId: string;
   status: string;
   error: string | null;
   hasAudio: boolean;
+  readOnly?: boolean;
 }) {
   const router = useRouter();
   const [override, setOverride] = useState<{ status: string; error: string | null } | null>(null);
-  const starting =
-    initialStatus === "uploaded" ? "transcribing" : initialStatus === "transcribed" ? "extracting" : null;
+  const starting = readOnly
+    ? null
+    : initialStatus === "uploaded"
+      ? "transcribing"
+      : initialStatus === "transcribed"
+        ? "extracting"
+        : null;
   const [busy, setBusy] = useState(starting !== null);
   const [stalled, setStalled] = useState(false);
   const status = override?.status ?? starting ?? initialStatus;
   const error = override ? override.error : initialError;
 
   useEffect(() => {
+    if (readOnly) return;
     const step = shouldAutoTranscribe(initialStatus)
       ? "transcribe"
       : shouldAutoExtract(initialStatus)
@@ -103,10 +111,10 @@ export function TranscriptionPanel({
     return () => {
       cancelled = true;
     };
-  }, [initialStatus, meetingId, router]);
+  }, [initialStatus, meetingId, readOnly, router]);
 
   useEffect(() => {
-    if (override) return;
+    if (readOnly || override) return;
     const pollingTranscription = shouldPollTranscription(initialStatus);
     const pollingExtraction = shouldPollExtraction(initialStatus);
     if (!pollingTranscription && !pollingExtraction) return;
@@ -116,9 +124,10 @@ export function TranscriptionPanel({
       window.clearInterval(poll);
       window.clearTimeout(stall);
     };
-  }, [initialStatus, override, router]);
+  }, [initialStatus, override, readOnly, router]);
 
   async function retry(step: "transcribe" | "extract") {
+    if (readOnly) return;
     setBusy(true);
     setStalled(false);
     setOverride({ status: step === "extract" ? "extracting" : "transcribing", error: null });
@@ -129,8 +138,8 @@ export function TranscriptionPanel({
     router.refresh();
   }
 
-  const extractionRetry = showExtractionRetry({ status, error, busy, stalled });
-  const transcriptionRetry = showTranscriptionRetry({ status, hasAudio, busy, stalled, error });
+  const extractionRetry = !readOnly && showExtractionRetry({ status, error, busy, stalled });
+  const transcriptionRetry = !readOnly && showTranscriptionRetry({ status, hasAudio, busy, stalled, error });
 
   return (
     <div>

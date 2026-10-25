@@ -40,6 +40,7 @@ export function MeetingRoom({
   decisions,
   commitments,
   droppedCount,
+  readOnly = false,
 }: {
   meetingId: string;
   playbackUrl: string | null;
@@ -57,6 +58,7 @@ export function MeetingRoom({
   decisions: DecisionRow[];
   commitments: CommitmentRow[];
   droppedCount: number;
+  readOnly?: boolean;
 }) {
   const audioRef = useRef<HTMLAudioElement | null>(null);
   const videoRef = useRef<HTMLVideoElement | null>(null);
@@ -245,6 +247,7 @@ export function MeetingRoom({
               meetingId={meetingId}
               speakers={speakers}
               ledgerChecked={ledgerChecked}
+              readOnly={readOnly}
             />
           ) : null}
           {ready ? (
@@ -256,6 +259,7 @@ export function MeetingRoom({
               commitments={commitments}
               droppedCount={droppedCount}
               onSeek={seek}
+              readOnly={readOnly}
             />
           ) : null}
         </div>

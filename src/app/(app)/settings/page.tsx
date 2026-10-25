@@ -20,7 +20,11 @@ export default async function SettingsPage() {
         Glossary terms, the language for new summaries, a redacted export, and a way to delete everything.
       </p>
       {error ? <p className="mt-4 text-sm text-destructive">{error.message}</p> : null}
-      <SettingsForm glossary={settings.glossary} summaryLanguage={settings.summaryLanguage} />
+      <SettingsForm
+        userId={user.id}
+        glossary={settings.glossary}
+        summaryLanguage={settings.summaryLanguage}
+      />
     </section>
   );
 }

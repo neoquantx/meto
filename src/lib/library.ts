@@ -139,6 +139,7 @@ export function libraryGroups(input: {
   titleMatchIds: ReadonlySet<string>;
   query: string;
   snippetLimit?: number;
+  readOnly?: boolean;
 }): LibraryGroup[] {
   const limit = input.snippetLimit ?? 5;
   const byMeeting = new Map<string, TranscriptHit[]>();
@@ -166,7 +167,7 @@ export function libraryGroups(input: {
         startMs: hit.startMs,
         idx: hit.idx,
         text: snippetForQuery(hit.text, input.query),
-        href: evidenceHref(meeting.id, hit.startMs, hit.idx),
+        href: evidenceHref(meeting.id, hit.startMs, hit.idx, { readOnly: input.readOnly }),
       })),
       extra: Math.max(0, raw.length - shown.length),
     });

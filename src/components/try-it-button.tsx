@@ -5,7 +5,11 @@ import { useRouter } from "next/navigation";
 import { createClient } from "@/lib/supabase/browser";
 import { Button } from "@/components/ui/button";
 
-export function TryItButton() {
+export function TryItButton({
+  size = "lg",
+}: {
+  size?: "default" | "sm" | "lg";
+}) {
   const router = useRouter();
   const [pending, setPending] = useState(false);
   const [error, setError] = useState<string | null>(null);
@@ -37,11 +41,11 @@ export function TryItButton() {
 
   return (
     <div className="flex flex-col items-start gap-2">
-      <Button size="lg" onClick={signIn} disabled={pending}>
+      <Button size={size} onClick={signIn} disabled={pending}>
         {pending ? "Signing in…" : "Try it"}
       </Button>
       {error ? (
-        <p className="max-w-sm text-sm text-destructive">{error}</p>
+        <p className="max-w-sm text-xs text-destructive">{error}</p>
       ) : null}
     </div>
   );

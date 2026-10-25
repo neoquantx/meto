@@ -43,10 +43,12 @@ export function SpeakerPanel({
   meetingId,
   speakers,
   ledgerChecked,
+  readOnly = false,
 }: {
   meetingId: string;
   speakers: SpeakerRow[];
   ledgerChecked: boolean;
+  readOnly?: boolean;
 }) {
   const router = useRouter();
   const [drafts, setDrafts] = useState<Record<number, string>>(() =>
@@ -56,6 +58,25 @@ export function SpeakerPanel({
   const [note, setNote] = useState<string | null>(null);
   const [error, setError] = useState<string | null>(null);
   const [checked, setChecked] = useState(ledgerChecked);
+
+  if (readOnly) {
+    return (
+      <section>
+        <h2 className="text-lg font-medium">Speakers</h2>
+        <ul className="mt-3 space-y-2 text-sm">
+          {speakers.map((speaker) => (
+            <li
+              key={speaker.speaker}
+              className="flex flex-wrap items-center justify-between gap-2 rounded-lg border px-3 py-2"
+            >
+              <span className="text-muted-foreground">Speaker {speaker.speaker}</span>
+              <span className="font-medium">{speaker.name ?? "Unnamed"}</span>
+            </li>
+          ))}
+        </ul>
+      </section>
+    );
+  }
 
   async function post(body: unknown, mode: "save" | "recheck") {
     setBusy(mode);
@@ -189,6 +210,7 @@ export function EvidencePanel({
   commitments,
   droppedCount,
   onSeek,
+  readOnly = false,
 }: {
   meetingId: string;
   tldr: string[];
@@ -197,6 +219,7 @@ export function EvidencePanel({
   commitments: CommitmentRow[];
   droppedCount: number;
   onSeek: (ms: number, segmentIdx?: number) => void;
+  readOnly?: boolean;
 }) {
   const owed = useMemo(() => whoOwesWhat(commitments), [commitments]);
 
@@ -207,7 +230,7 @@ export function EvidencePanel({
           <h2 className="text-lg font-medium">TL;DR</h2>
           <ul className="mt-2 list-disc space-y-1 pl-5 text-sm">
             {tldr.map((line, index) => (
-              <li key={`${index}-${line}`}>{line}</li>
+              <li key={`${index}-${line}`} className="break-words">{line}</li>
             ))}
           </ul>
         </section>
@@ -224,7 +247,7 @@ export function EvidencePanel({
                 <p className="text-sm font-medium">{group.label}</p>
                 <ul className="mt-1 space-y-1">
                   {group.items.map((item) => (
-                    <li key={item.id} className="text-sm">
+                    <li key={item.id} className="text-sm break-words">
                       <span className="mr-2 rounded-full border px-2 py-0.5 text-xs">
                         {kindLabel(item.kind)}
                       </span>
@@ -255,15 +278,15 @@ export function EvidencePanel({
                     </span>
                     {state ? <span className="text-muted-foreground">{state}</span> : null}
                   </p>
-                  <p className="mt-2 text-sm">{item.text}</p>
+                  <p className="mt-2 text-sm break-words">{item.text}</p>
                   {item.condition ? (
-                    <p className="mt-1 text-sm text-muted-foreground">If {item.condition}</p>
+                    <p className="mt-1 text-sm text-muted-foreground break-words">If {item.condition}</p>
                   ) : null}
                   {item.due_date ? (
                     <p className="mt-1 text-sm text-muted-foreground">Due {item.due_date}</p>
                   ) : null}
                   {item.change_note ? (
-                    <p className="mt-1 text-sm text-muted-foreground">{item.change_note}</p>
+                    <p className="mt-1 text-sm text-muted-foreground break-words">{item.change_note}</p>
                   ) : null}
                   <QuoteChip
                     quote={item.quote}
@@ -274,12 +297,23 @@ export function EvidencePanel({
                     <ul className="mt-2 space-y-1">
                       {item.history.map((event, index) => (
                         <li key={`${event.meetingId}-${index}`}>
-                          <HistoryLine event={event} meetingId={meetingId} onSeek={onSeek} />
+                          <HistoryLine
+                            event={event}
+                            meetingId={meetingId}
+                            onSeek={onSeek}
+                            readOnly={readOnly}
+                          />
                         </li>
                       ))}
                     </ul>
                   ) : null}
-                  <ReviewButtons meetingId={meetingId} target="commitment" id={item.id} review={item.review} />
+                  {readOnly ? (
+                    item.review === "confirmed" ? (
+                      <p className="mt-2 text-xs text-muted-foreground">Confirmed</p>
+                    ) : null
+                  ) : (
+                    <ReviewButtons meetingId={meetingId} target="commitment" id={item.id} review={item.review} />
+                  )}
                 </li>
               );
             })}
@@ -295,13 +329,19 @@ export function EvidencePanel({
           <ul className="mt-3 space-y-4">
             {decisions.map((item) => (
               <li key={item.id} className="rounded-lg border p-3">
-                <p className="text-sm">{item.text}</p>
+                <p className="text-sm break-words">{item.text}</p>
                 <QuoteChip
                   quote={item.quote}
                   startMs={item.start_ms}
                   onSeek={() => onSeek(item.start_ms, item.segment_idx)}
                 />
-                <ReviewButtons meetingId={meetingId} target="decision" id={item.id} review={item.review} />
+                {readOnly ? (
+                  item.review === "confirmed" ? (
+                    <p className="mt-2 text-xs text-muted-foreground">Confirmed</p>
+                  ) : null
+                ) : (
+                  <ReviewButtons meetingId={meetingId} target="decision" id={item.id} review={item.review} />
+                )}
               </li>
             ))}
           </ul>
@@ -342,12 +382,14 @@ function HistoryLine({
   event,
   meetingId,
   onSeek,
+  readOnly,
 }: {
   event: CommitmentHistory;
   meetingId: string;
   onSeek: (ms: number, segmentIdx?: number) => void;
+  readOnly: boolean;
 }) {
-  const className = "text-xs text-muted-foreground underline-offset-4 hover:underline";
+  const className = "text-xs text-muted-foreground underline-offset-4 hover:underline break-words";
   if (event.meetingId === meetingId && event.startMs != null) {
     return (
       <button
@@ -360,7 +402,10 @@ function HistoryLine({
     );
   }
   return (
-    <Link className={className} href={evidenceHref(event.meetingId, event.startMs, event.segmentIdx)}>
+    <Link
+      className={className}
+      href={evidenceHref(event.meetingId, event.startMs, event.segmentIdx, { readOnly })}
+    >
       {event.line}
     </Link>
   );
@@ -378,7 +423,7 @@ function QuoteChip({
   return (
     <button
       type="button"
-      className="mt-2 block max-w-full rounded-md border px-2 py-1 text-left text-xs text-muted-foreground hover:bg-muted"
+      className="mt-2 block max-w-full rounded-md border px-2 py-1 text-left text-xs text-muted-foreground hover:bg-muted break-words"
       onClick={onSeek}
     >
       {formatTimestamp(startMs)} · “{quote}”

@@ -19,9 +19,11 @@ async function errorMessage(response: Response, fallback: string) {
 }
 
 export function SettingsForm({
+  userId,
   glossary,
   summaryLanguage,
 }: {
+  userId?: string;
   glossary: string[];
   summaryLanguage: SummaryLanguage;
 }) {
@@ -31,6 +33,18 @@ export function SettingsForm({
   const [busy, setBusy] = useState<"save" | "export" | "delete" | null>(null);
   const [notice, setNotice] = useState<string | null>(null);
   const [error, setError] = useState<string | null>(null);
+
+  async function copyUserId() {
+    if (!userId) return;
+    setNotice(null);
+    setError(null);
+    try {
+      await navigator.clipboard.writeText(userId);
+      setNotice("Account ID copied.");
+    } catch {
+      setNotice(userId);
+    }
+  }
 
   async function save() {
     setBusy("save");
@@ -116,6 +130,22 @@ export function SettingsForm({
 
   return (
     <div className="mt-8 max-w-xl space-y-10">
+      {userId ? (
+        <section className="space-y-2">
+          <h2 className="text-lg font-medium">Account ID</h2>
+          <p className="text-sm text-muted-foreground">
+            Use this ID as <code className="rounded bg-muted px-1 py-0.5 text-xs">DEMO_OWNER_ID</code> to publish this account&apos;s meetings to the read-only <code className="rounded bg-muted px-1 py-0.5 text-xs">/demo</code> view.
+          </p>
+          <div className="flex flex-wrap items-center gap-2">
+            <code className="rounded-lg border bg-muted/40 px-3 py-1.5 font-mono text-xs break-all">
+              {userId}
+            </code>
+            <Button type="button" size="sm" variant="outline" onClick={() => void copyUserId()}>
+              Copy ID
+            </Button>
+          </div>
+        </section>
+      ) : null}
       <section className="space-y-4">
         <div>
           <h2 className="text-lg font-medium">Glossary</h2>

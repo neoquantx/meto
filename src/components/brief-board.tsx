@@ -17,12 +17,16 @@ export function BriefBoard({
   people,
   commitments,
   decisions,
+  readOnly = false,
 }: {
   people: { id: string; name: string }[];
   commitments: BriefCommitment[];
   decisions: BriefDecision[];
+  readOnly?: boolean;
 }) {
-  const [selected, setSelected] = useState<string[]>([]);
+  const [selected, setSelected] = useState<string[]>(() =>
+    readOnly ? people.map((person) => person.id) : [],
+  );
   const brief = useMemo(
     () => buildBrief({ personIds: selected, people, commitments, decisions }),
     [selected, people, commitments, decisions],
@@ -69,13 +73,13 @@ export function BriefBoard({
                           <p className="text-xs text-muted-foreground">
                             {ledgerStatusLabel(item.status)} · {kindLabel(item.kind)}
                           </p>
-                          <p className="mt-1 text-sm">{item.text}</p>
+                          <p className="mt-1 text-sm break-words">{item.text}</p>
                           {item.changeNote ? (
-                            <p className="mt-1 text-sm text-muted-foreground">{item.changeNote}</p>
+                            <p className="mt-1 text-sm text-muted-foreground break-words">{item.changeNote}</p>
                           ) : null}
                           <Link
-                            className="mt-2 block text-xs text-muted-foreground underline-offset-4 hover:underline"
-                            href={evidenceHref(item.meetingId, item.startMs, item.segmentIdx)}
+                            className="mt-2 block text-xs text-muted-foreground underline-offset-4 hover:underline break-words"
+                            href={evidenceHref(item.meetingId, item.startMs, item.segmentIdx, { readOnly })}
                           >
                             {item.meetingTitle}, {formatLedgerDate(item.recordedAt)} · {formatTimestamp(item.startMs)} · “
                             {item.quote}”
@@ -96,10 +100,10 @@ export function BriefBoard({
               <ul className="mt-3 space-y-3">
                 {brief.decisions.map((item) => (
                   <li key={item.id} className="rounded-lg border p-3">
-                    <p className="text-sm">{item.text}</p>
+                    <p className="text-sm break-words">{item.text}</p>
                     <Link
-                      className="mt-2 block text-xs text-muted-foreground underline-offset-4 hover:underline"
-                      href={evidenceHref(item.meetingId, item.startMs, item.segmentIdx)}
+                      className="mt-2 block text-xs text-muted-foreground underline-offset-4 hover:underline break-words"
+                      href={evidenceHref(item.meetingId, item.startMs, item.segmentIdx, { readOnly })}
                     >
                       {item.meetingTitle}, {formatLedgerDate(item.recordedAt)} · {formatTimestamp(item.startMs)} · “
                       {item.quote}”

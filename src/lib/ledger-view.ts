@@ -130,14 +130,20 @@ export function toHistoryLinks(events: StoredEvent[]): HistoryLink[] {
     }));
 }
 
-export function evidenceHref(meetingId: string, startMs: number | null, segmentIdx: number | null) {
+export function evidenceHref(
+  meetingId: string,
+  startMs: number | null,
+  segmentIdx: number | null,
+  options?: { readOnly?: boolean },
+) {
+  const base = options?.readOnly ? `/demo/meetings/${meetingId}` : `/meetings/${meetingId}`;
   const params = new URLSearchParams();
   if (startMs != null && startMs >= 0 && Number.isSafeInteger(startMs)) params.set("t", String(startMs));
   if (segmentIdx != null && segmentIdx >= 0 && Number.isSafeInteger(segmentIdx)) {
     params.set("line", String(segmentIdx));
   }
   const query = params.toString();
-  return query ? `/meetings/${meetingId}?${query}` : `/meetings/${meetingId}`;
+  return query ? `${base}?${query}` : base;
 }
 
 export function parseEvidenceQuery(t: string | undefined, line: string | undefined) {
