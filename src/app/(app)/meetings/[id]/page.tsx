@@ -1,14 +1,18 @@
 import Link from "next/link";
 import { notFound } from "next/navigation";
 import { MeetingRoom } from "@/components/meeting-room";
+import { SharePanel } from "@/components/share-panel";
 import { TranscriptionPanel } from "@/components/transcription-panel";
 import { buttonVariants } from "@/components/ui/button";
 import { parseOffRecordRanges } from "@/lib/capture-limits";
+import { loadCommitmentHistory } from "@/lib/ledger-data";
+import { parseEvidenceQuery } from "@/lib/ledger-view";
 import {
   parseChapters,
   parseTldr,
   readCommitment,
   readDecision,
+  readPersonName,
   readSegment,
   readSpeaker,
   type CommitmentRow,
@@ -16,9 +20,8 @@ import {
   type SpeakerRow,
   type TranscriptSegment,
 } from "@/lib/meeting-view";
-import { loadCommitmentHistory } from "@/lib/ledger-data";
-import { parseEvidenceQuery } from "@/lib/ledger-view";
 import { formatDuration } from "@/lib/playback";
+import { readShareLink, sharePeople, type ShareLink } from "@/lib/share-view";
 import { createAdminClient } from "@/lib/supabase/admin";
 import { getUserOrThrow } from "@/lib/supabase/server";
 
@@ -108,7 +111,7 @@ export default async function MeetingPage({
         .order("idx", { ascending: true }),
       admin
         .from("meeting_speakers")
-        .select("speaker, name_hint, person:people(name)")
+        .select("speaker, person_id, name_hint, person:people(name)")
         .eq("meeting_id", id)
         .order("speaker", { ascending: true }),
     ]);
@@ -120,8 +123,9 @@ export default async function MeetingPage({
 
   let decisions: DecisionRow[] = [];
   let commitments: CommitmentRow[] = [];
+  let shares: ShareLink[] = [];
   if (meeting.status === "ready") {
-    const [decisionResult, commitmentResult] = await Promise.all([
+    const [decisionResult, commitmentResult, shareResult] = await Promise.all([
       admin
         .from("decisions")
         .select("id, text, quote, start_ms, segment_idx, review")
@@ -136,11 +140,25 @@ export default async function MeetingPage({
         .eq("meeting_id", id)
         .eq("owner_id", user.id)
         .order("start_ms", { ascending: true }),
+      admin
+        .from("shares")
+        .select("token, person_id, person:people(name)")
+        .eq("meeting_id", id)
+        .eq("owner_id", user.id)
+        .eq("revoked", false),
     ]);
     if (decisionResult.error) loadError = decisionResult.error.message;
     else decisions = rows(decisionResult.data, readDecision);
     if (commitmentResult.error) loadError = commitmentResult.error.message;
     else commitments = rows(commitmentResult.data, readCommitment);
+    if (shareResult.error) loadError = shareResult.error.message;
+    else {
+      shares = [];
+      for (const row of shareResult.data ?? []) {
+        const link = readShareLink(row, readPersonName((row as { person?: unknown }).person));
+        if (link) shares.push(link);
+      }
+    }
     if (!loadError && commitments.length > 0) {
       try {
         const history = await loadCommitmentHistory(
@@ -174,6 +192,15 @@ export default async function MeetingPage({
           New meeting
         </Link>
       </div>
+      {ready ? (
+        <div className="mt-8 max-w-2xl">
+          <SharePanel
+            meetingId={meeting.id}
+            people={sharePeople(speakers)}
+            shares={shares}
+          />
+        </div>
+      ) : null}
       {meeting.status !== "ready" ? (
         <div className="mt-6 max-w-2xl">
           <TranscriptionPanel

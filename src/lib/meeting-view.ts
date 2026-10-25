@@ -13,6 +13,7 @@ export type TranscriptSegment = {
 
 export type SpeakerRow = {
   speaker: number;
+  personId: string | null;
   name: string | null;
   name_hint: string | null;
 };
@@ -212,6 +213,7 @@ export function readSpeaker(row: unknown): SpeakerRow | null {
   const hint = textField(record.name_hint)?.trim() ?? "";
   return {
     speaker: record.speaker,
+    personId: typeof record.person_id === "string" ? record.person_id : null,
     name: readPersonName(record.person),
     name_hint: hint || null,
   };

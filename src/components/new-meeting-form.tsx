@@ -52,7 +52,11 @@ function formatClock(ms: number) {
   return `${minutes}:${String(seconds).padStart(2, "0")}`;
 }
 
-export function NewMeetingForm() {
+export function NewMeetingForm({
+  defaultLanguage = "en",
+}: {
+  defaultLanguage?: SummaryLanguage;
+}) {
   const router = useRouter();
   const recorder = useMeetingRecorder();
   const fileRef = useRef<HTMLInputElement>(null);
@@ -60,7 +64,7 @@ export function NewMeetingForm() {
   const [consented, setConsented] = useState(false);
   const [consentNote, setConsentNote] = useState("");
   const [title, setTitle] = useState("");
-  const [summaryLanguage, setSummaryLanguage] = useState<SummaryLanguage>("en");
+  const [summaryLanguage, setSummaryLanguage] = useState<SummaryLanguage>(defaultLanguage);
   const [when, setWhen] = useState("");
   const [whenTouched, setWhenTouched] = useState(false);
   const [fileError, setFileError] = useState<string | null>(null);
