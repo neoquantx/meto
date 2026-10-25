@@ -53,6 +53,10 @@ export function RecoverBanner() {
   if (!session && !error) return null;
 
   async function recover(current: LocalSession) {
+    const confirmed = window.confirm(
+      "Upload this recording and start transcription?",
+    );
+    if (!confirmed) return;
     setPending("upload");
     setError(null);
     try {

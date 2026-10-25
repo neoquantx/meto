@@ -1,7 +1,5 @@
+import { PageLoading } from "@/components/page-loading";
+
 export default function DemoLoading() {
-  return (
-    <section aria-busy="true" aria-live="polite">
-      <p className="text-sm text-muted-foreground">Loading demo…</p>
-    </section>
-  );
+  return <PageLoading demo />;
 }

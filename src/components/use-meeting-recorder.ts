@@ -23,7 +23,7 @@ export type CaptureDetails = {
   consentNote: string | null;
 };
 
-type Phase = "idle" | "recording" | "paused" | "uploading";
+type Phase = "idle" | "recording" | "paused" | "review" | "uploading";
 
 function pickRecorderMime() {
   if (typeof MediaRecorder === "undefined") return "";
@@ -32,9 +32,24 @@ function pickRecorderMime() {
   return "";
 }
 
+function pickVideoMime() {
+  if (typeof MediaRecorder === "undefined") return "";
+  if (MediaRecorder.isTypeSupported("video/webm;codecs=vp9,opus")) return "video/webm;codecs=vp9,opus";
+  if (MediaRecorder.isTypeSupported("video/webm;codecs=vp8,opus")) return "video/webm;codecs=vp8,opus";
+  if (MediaRecorder.isTypeSupported("video/webm")) return "video/webm";
+  if (MediaRecorder.isTypeSupported("video/mp4")) return "video/mp4";
+  return "";
+}
+
 function createRecorder(stream: MediaStream, mime: string) {
+  const isVideo = mime.startsWith("video/");
   try {
-    return new MediaRecorder(stream, { mimeType: mime, audioBitsPerSecond: 32000 });
+    return new MediaRecorder(
+      stream,
+      isVideo
+        ? { mimeType: mime, videoBitsPerSecond: 600_000, audioBitsPerSecond: 64_000 }
+        : { mimeType: mime, audioBitsPerSecond: 32000 },
+    );
   } catch {
     return new MediaRecorder(stream, { mimeType: mime });
   }
@@ -65,7 +80,7 @@ export function useMeetingRecorder() {
   const pauseAtMsRef = useRef(0);
   const rangesRef = useRef<OffRecordRange[]>([]);
   const silentSinceRef = useRef<number | null>(null);
-  const stopIntentRef = useRef<"upload" | "keep">("keep");
+  const stopIntentRef = useRef<"review" | "keep">("keep");
   const chainRef = useRef(Promise.resolve());
   const chunkErrorRef = useRef<string | null>(null);
   const mountedRef = useRef(true);
@@ -245,8 +260,11 @@ export function useMeetingRecorder() {
           setPhaseBoth("idle");
           return;
         }
-        if (stopIntentRef.current === "upload") await finishUpload();
-        else {
+        if (stopIntentRef.current === "review") {
+          // Keep the local copy. Nothing uploads until the user confirms twice in the UI.
+          setLiveSession(null);
+          setPhaseBoth("review");
+        } else {
           setLiveSession(null);
           setPhaseBoth("idle");
         }
@@ -415,7 +433,7 @@ export function useMeetingRecorder() {
       streamsRef.current = [display, mic, destination.stream];
       tabAudio[0].onended = () => {
         if (recorderRef.current && recorderRef.current.state !== "inactive") {
-          stopIntentRef.current = "upload";
+          stopIntentRef.current = "review";
           recorderRef.current.stop();
         }
       };
@@ -430,6 +448,88 @@ export function useMeetingRecorder() {
       const message = reason instanceof Error ? reason.message : "Could not capture the meeting tab.";
       if (/denied|permission/i.test(message)) {
         setError("Microphone or tab sharing was blocked. Allow both and try again.");
+      } else {
+        setError(message);
+      }
+    }
+  }
+
+  async function startScreen(details: CaptureDetails) {
+    if (phaseRef.current !== "idle") return;
+    const mime = pickVideoMime();
+    if (!mime) {
+      setError("This browser cannot record screen video. Use Meeting tab + mic, or upload a file.");
+      return;
+    }
+    phaseRef.current = "recording";
+    setError(null);
+    stopIntentRef.current = "keep";
+    let display: MediaStream | null = null;
+    let mic: MediaStream | null = null;
+    try {
+      display = await navigator.mediaDevices.getDisplayMedia({ video: true, audio: true });
+      if (!mountedRef.current) {
+        stopTracks(display);
+        phaseRef.current = "idle";
+        return;
+      }
+      const tabAudio = display.getAudioTracks();
+      if (tabAudio.length === 0) {
+        stopTracks(display);
+        phaseRef.current = "idle";
+        setError("Tick 'Share tab audio' (or 'Share system audio') and try again, so the meeting sound is captured — not just the picture.");
+        return;
+      }
+      mic = await navigator.mediaDevices.getUserMedia({
+        audio: { echoCancellation: true, noiseSuppression: true },
+      });
+      if (!mountedRef.current) {
+        stopTracks(display);
+        stopTracks(mic);
+        phaseRef.current = "idle";
+        return;
+      }
+      if (await unfinishedSession()) {
+        stopTracks(display);
+        stopTracks(mic);
+        phaseRef.current = "idle";
+        setError("Finish or discard the unfinished recording above before starting another.");
+        return;
+      }
+      const context = new AudioContext();
+      audioCtxRef.current = context;
+      void context.resume();
+      const destination = context.createMediaStreamDestination();
+      const tabSource = context.createMediaStreamSource(new MediaStream(tabAudio));
+      const micSource = context.createMediaStreamSource(mic);
+      const analyser = context.createAnalyser();
+      analyser.fftSize = 2048;
+      tabSource.connect(analyser);
+      micSource.connect(analyser);
+      tabSource.connect(destination);
+      micSource.connect(destination);
+      const combined = new MediaStream([
+        ...display.getVideoTracks(),
+        ...destination.stream.getAudioTracks(),
+      ]);
+      streamsRef.current = [display, mic, destination.stream];
+      display.getVideoTracks()[0].onended = () => {
+        if (recorderRef.current && recorderRef.current.state !== "inactive") {
+          stopIntentRef.current = "review";
+          recorderRef.current.stop();
+        }
+      };
+      await armRecorder(combined, "tab", details, mime);
+      startMeter(analyser);
+    } catch (reason) {
+      stopTracks(display);
+      stopTracks(mic);
+      releaseHardware();
+      setLiveSession(null);
+      phaseRef.current = "idle";
+      const message = reason instanceof Error ? reason.message : "Could not capture the screen.";
+      if (/denied|permission/i.test(message)) {
+        setError("Microphone or screen sharing was blocked. Allow both and try again.");
       } else {
         setError(message);
       }
@@ -484,8 +584,24 @@ export function useMeetingRecorder() {
   function stop() {
     const recorder = recorderRef.current;
     if (!recorder || recorder.state === "inactive") return;
-    stopIntentRef.current = "upload";
+    stopIntentRef.current = "review";
     recorder.stop();
+  }
+
+  async function confirmUpload() {
+    if (phaseRef.current !== "review") return;
+    await finishUpload();
+  }
+
+  async function discardRecording() {
+    const session = sessionRef.current;
+    if (session) await deleteSession(session.sessionId);
+    sessionRef.current = null;
+    setLiveSession(null);
+    setElapsedMs(0);
+    setLevel(0);
+    setSilent(false);
+    setPhaseBoth("idle");
   }
 
   useEffect(() => {
@@ -519,7 +635,7 @@ export function useMeetingRecorder() {
       mountedRef.current = false;
       const recorder = recorderRef.current;
       if (recorder && recorder.state !== "inactive") {
-        if (stopIntentRef.current !== "upload") stopIntentRef.current = "keep";
+        stopIntentRef.current = "keep";
         recorder.stop();
       }
     };
@@ -534,8 +650,11 @@ export function useMeetingRecorder() {
     clearError: () => setError(null),
     startMic,
     startTab,
+    startScreen,
     pause,
     resume,
     stop,
+    confirmUpload,
+    discardRecording,
   };
 }

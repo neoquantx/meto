@@ -184,7 +184,7 @@ export function parseOffRecordRanges(value: unknown): OffRecordRange[] {
 export function isChromeDesktop(userAgent: string) {
   if (/Android|iPhone|iPad|iPod|Mobile/i.test(userAgent)) return false;
   if (!/Chrome\/\d+/.test(userAgent)) return false;
-  if (/Edg\/|OPR\/|SamsungBrowser|Firefox\//.test(userAgent)) return false;
+  if (/SamsungBrowser|Firefox\//.test(userAgent)) return false;
   return true;
 }
 

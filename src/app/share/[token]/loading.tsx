@@ -1,11 +1,10 @@
 import { ShareFrame } from "@/components/share-document";
+import { PageLoading } from "@/components/page-loading";
 
 export default function ShareLoading() {
   return (
     <ShareFrame>
-      <p className="text-sm text-muted-foreground" aria-busy="true" aria-live="polite">
-        Loading shared notes…
-      </p>
+      <PageLoading />
     </ShareFrame>
   );
 }

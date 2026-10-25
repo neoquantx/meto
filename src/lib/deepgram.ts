@@ -80,21 +80,28 @@ export function glossaryKeyterms(glossary: unknown) {
   return terms;
 }
 
-export function buildListenUrl(keyterms: string[]) {
+export function buildListenUrl(keyterms: string[], coreOnly = false) {
   const url = new URL(LISTEN_URL);
   url.searchParams.set("model", "nova-3");
   url.searchParams.set("language", "multi");
-  url.searchParams.set("diarize_model", "latest");
+  url.searchParams.set("diarize", "true");
   url.searchParams.set("utterances", "true");
   url.searchParams.set("smart_format", "true");
   url.searchParams.set("mip_opt_out", "true");
-  for (const term of keyterms) url.searchParams.append("keyterm", term);
+  if (!coreOnly) {
+    for (const term of keyterms) url.searchParams.append("keyterm", term);
+  }
   return url.toString();
 }
 
 export function shouldRetryWithoutKeyterms(status: number, raw: string, sentKeyterms: boolean) {
   if (!sentKeyterms || status < 400 || status >= 500) return false;
   return /keyterm/i.test(raw);
+}
+
+export function shouldRetryWithoutOptionalParams(status: number, raw: string) {
+  if (status < 400 || status >= 500) return false;
+  return /diarize|keyterm|INVALID_QUERY_PARAMETER/i.test(raw);
 }
 
 export function deepgramFailureMessage(status: number, raw: string) {
@@ -182,6 +189,13 @@ export async function transcribeAudio(options: {
     throw new DeepgramError(deepgramFailureMessage(second.status, second.raw), 502, "deepgram");
   }
 
+  if (shouldRetryWithoutOptionalParams(first.status, first.raw)) {
+    log("Deepgram rejected an optional parameter; retrying with core params only.");
+    const second = await requestListen(fetchImpl, options, [], true);
+    if (second.ok) return second.result;
+    throw new DeepgramError(deepgramFailureMessage(second.status, second.raw), 502, "deepgram");
+  }
+
   const status = first.status === 402 || first.status === 429 ? 429 : 502;
   throw new DeepgramError(deepgramFailureMessage(first.status, first.raw), status, "deepgram");
 }
@@ -190,6 +204,7 @@ async function requestListen(
   fetchImpl: ListenFetcher,
   options: { apiKey: string; audioUrl: string; timeoutMs?: number },
   keyterms: string[],
+  coreOnly = false,
 ) {
   const controller = new AbortController();
   const timeoutMs = options.timeoutMs ?? DEFAULT_TIMEOUT_MS;
@@ -199,7 +214,7 @@ async function requestListen(
   try {
     let response: Response;
     try {
-      response = await fetchImpl(buildListenUrl(keyterms), {
+      response = await fetchImpl(buildListenUrl(keyterms, coreOnly), {
         method: "POST",
         headers: {
           Authorization: `Token ${options.apiKey}`,

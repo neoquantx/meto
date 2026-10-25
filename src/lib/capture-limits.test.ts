@@ -95,9 +95,9 @@ describe("audio paths and browsers", () => {
     expect(mimeFromFileName("notes.m4a")).toBe("audio/mp4");
   });
 
-  it("offers tab capture on desktop Chrome only", () => {
+  it("offers tab capture on desktop Chromium browsers only", () => {
     expect(isChromeDesktop(CHROME)).toBe(true);
-    expect(isChromeDesktop(EDGE)).toBe(false);
+    expect(isChromeDesktop(EDGE)).toBe(true);
     expect(isChromeDesktop(ANDROID)).toBe(false);
     expect(canOfferTabCapture(CHROME, true)).toBe(true);
     expect(canOfferTabCapture(CHROME, false)).toBe(false);

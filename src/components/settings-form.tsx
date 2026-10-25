@@ -130,7 +130,7 @@ export function SettingsForm({
   }
 
   return (
-    <div className="mt-8 grid gap-5 lg:grid-cols-2">
+    <div className="mt-8 min-w-0 grid gap-5 lg:grid-cols-2">
       {userId ? (
         <section className="surface space-y-3 p-5 sm:p-6 lg:col-span-2">
           <div className="flex items-center gap-2">
@@ -200,7 +200,7 @@ export function SettingsForm({
           {busy === "export" ? "Exporting…" : "Export all"}
         </Button>
       </section>
-      <section className="rounded-2xl border border-destructive/20 bg-destructive/3 p-5 shadow-xs sm:p-6">
+      <section className="min-w-0 rounded-2xl border border-destructive/20 bg-destructive/3 p-5 shadow-xs sm:p-6">
         <span className="grid size-10 place-items-center rounded-xl bg-destructive/10 text-destructive">
           <Trash2 className="size-4.5" aria-hidden="true" />
         </span>
