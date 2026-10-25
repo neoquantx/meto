@@ -4,6 +4,7 @@ import { useEffect, useState } from "react";
 import { useRouter } from "next/navigation";
 import { Check, CircleAlert, LoaderCircle } from "lucide-react";
 import { Button } from "@/components/ui/button";
+import { EXTRACT_TEMPORARILY_UNAVAILABLE } from "@/lib/extraction-messages";
 import {
   processingStepMark,
   shouldAutoExtract,
@@ -33,6 +34,13 @@ const MARK_LABEL: Record<StepMark, string> = {
 type RunResult = { ok: true; status: string } | { ok: false; error: string };
 
 const inflight = new Map<string, Promise<RunResult>>();
+
+function readableError(error: string) {
+  if (/UNAVAILABLE|high demand|temporarily unavailable|service unavailable/i.test(error)) {
+    return EXTRACT_TEMPORARILY_UNAVAILABLE;
+  }
+  return error;
+}
 
 function runStep(meetingId: string, step: "transcribe" | "extract") {
   const key = `${meetingId}:${step}`;
@@ -193,7 +201,9 @@ export function TranscriptionPanel({
       {status === "ready" ? (
         <p className="mt-3 text-sm text-muted-foreground">Decisions and commitments are saved.</p>
       ) : null}
-      {status === "failed" && error ? <p className="mt-3 text-sm text-destructive">{error}</p> : null}
+      {status === "failed" && error ? (
+        <p className="mt-3 text-sm text-destructive">{readableError(error)}</p>
+      ) : null}
       {extractionRetry ? (
         <Button className="mt-4" type="button" onClick={() => void retry("extract")}>
           Retry

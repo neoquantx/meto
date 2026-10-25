@@ -2,6 +2,7 @@ import { ApiError, GoogleGenAI, Type, type Schema } from "@google/genai";
 import { z } from "zod";
 import {
   EXTRACT_UNUSABLE,
+  EXTRACT_TEMPORARILY_UNAVAILABLE,
   QUOTA_MESSAGE,
   extractionFailure,
 } from "@/lib/extraction-messages";
@@ -297,6 +298,13 @@ function asExtractError(error: unknown) {
   if (error instanceof ExtractError) return error;
   const status = statusCode(error);
   const message = error instanceof Error ? error.message : "";
+  if (
+    status === 503 ||
+    status === 504 ||
+    /UNAVAILABLE|high demand|temporarily unavailable|service unavailable/i.test(message)
+  ) {
+    return new ExtractError(EXTRACT_TEMPORARILY_UNAVAILABLE, 503, "unavailable");
+  }
   if (status === 429 || /RESOURCE_EXHAUSTED|quota exceeded|\b429\b/i.test(message)) {
     return new ExtractError(QUOTA_MESSAGE, 429, "quota");
   }

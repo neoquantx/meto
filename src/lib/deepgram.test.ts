@@ -26,8 +26,8 @@ describe("deepgram listen", () => {
     const url = new URL(buildListenUrl(["Rahul", "pricing deck"]));
     expect(url.searchParams.get("model")).toBe("nova-3");
     expect(url.searchParams.get("language")).toBe("multi");
-    expect(url.searchParams.get("diarize")).toBe("true");
-    expect(url.searchParams.get("diarize_model")).toBeNull();
+    expect(url.searchParams.get("diarize")).toBeNull();
+    expect(url.searchParams.get("diarize_model")).toBe("latest");
     expect(url.searchParams.get("utterances")).toBe("true");
     expect(url.searchParams.get("smart_format")).toBe("true");
     expect(url.searchParams.get("mip_opt_out")).toBe("true");

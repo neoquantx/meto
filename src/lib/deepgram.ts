@@ -84,7 +84,7 @@ export function buildListenUrl(keyterms: string[], coreOnly = false) {
   const url = new URL(LISTEN_URL);
   url.searchParams.set("model", "nova-3");
   url.searchParams.set("language", "multi");
-  url.searchParams.set("diarize", "true");
+  url.searchParams.set("diarize_model", "latest");
   url.searchParams.set("utterances", "true");
   url.searchParams.set("smart_format", "true");
   url.searchParams.set("mip_opt_out", "true");
@@ -101,7 +101,7 @@ export function shouldRetryWithoutKeyterms(status: number, raw: string, sentKeyt
 
 export function shouldRetryWithoutOptionalParams(status: number, raw: string) {
   if (status < 400 || status >= 500) return false;
-  return /diarize|keyterm|INVALID_QUERY_PARAMETER/i.test(raw);
+  return /diarize(?:_model)?|keyterm|INVALID_QUERY_PARAMETER/i.test(raw);
 }
 
 export function deepgramFailureMessage(status: number, raw: string) {

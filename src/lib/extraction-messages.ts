@@ -1,6 +1,8 @@
 export const QUOTA_MESSAGE = "Daily AI limit reached, try again tomorrow";
 export const EXTRACT_UNCONFIGURED = "Extraction is not configured.";
 export const EXTRACT_UNUSABLE = "The model returned an unusable extraction. Try again.";
+export const EXTRACT_TEMPORARILY_UNAVAILABLE =
+  "The AI model is temporarily busy. Please try again in a moment.";
 
 export function isExtractionFailure(error: string | null) {
   if (!error) return false;
@@ -8,6 +10,7 @@ export function isExtractionFailure(error: string | null) {
     error === QUOTA_MESSAGE ||
     error === EXTRACT_UNCONFIGURED ||
     error === EXTRACT_UNUSABLE ||
+    error === EXTRACT_TEMPORARILY_UNAVAILABLE ||
     error.startsWith("Extraction failed")
   );
 }
