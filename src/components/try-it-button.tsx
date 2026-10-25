@@ -28,6 +28,15 @@ export function TryItButton({
     }
 
     const supabase = createClient();
+    const {
+      data: { session },
+    } = await supabase.auth.getSession();
+    if (session?.user) {
+      router.push("/meetings");
+      router.refresh();
+      return;
+    }
+
     const { error: signInError } = await supabase.auth.signInAnonymously();
     if (signInError) {
       setError(signInError.message);
